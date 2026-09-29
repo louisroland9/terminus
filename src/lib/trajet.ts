@@ -33,7 +33,7 @@ function voisins(g: number): number[] {
   return [...set];
 }
 
-export type Etape = { gare: Gare; arrivee?: string; depart?: string; train?: string; attente?: number; arrets?: number };
+export type Etape = { gare: Gare; arrivee?: string; depart?: string; train?: string; attente?: number | undefined; arrets?: number };
 export type Trajet = { etapes: Etape[]; duree: number; distance: number; depts: string[] };
 
 const fmt = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;

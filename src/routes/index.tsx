@@ -233,11 +233,6 @@ function Index() {
                     </span>
                   </div>
                   <p className="mt-5 font-display text-2xl leading-tight">Retour à {gareDepart.nom}</p>
-                  {trajet.retourPrevu && (
-                    <p className="mt-3 rounded-lg bg-black/10 px-3 py-2 font-mono text-sm font-bold">
-                      Arrivée estimée le {trajet.retourPrevu.toLocaleString("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  )}
                   <p className="mt-2 font-mono text-xs">
                     Deadline : {trajet.dateLimiteRetour.toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </p>
@@ -301,7 +296,7 @@ function ListeEtapes({ etapes, retour = false }: { etapes: Etape[]; retour?: boo
                 <p className="font-mono text-sm font-bold">
                   {etape.arrivee && <span>arr. {etape.arrivee}</span>}
                   {etape.arrivee && etape.depart && " · "}
-                  {etape.depart && <span className="text-primary-foreground">dép. {etape.depart}</span>}
+                  {etape.depart && <span className={retour ? "text-primary-foreground" : "text-primary"}>dép. {etape.depart}</span>}
                 </p>
               </div>
               <p className={`text-sm ${teinteSecondaire}`}>{etape.gare.dept}</p>

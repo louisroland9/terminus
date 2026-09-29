@@ -176,7 +176,7 @@ function Index() {
                     Billet n°{String(n).padStart(3, "0")}
                   </span>
                   <span className="-rotate-3 rounded-lg brut bg-pop px-3 py-1 font-display text-sm">
-                    {trajet.etapes.length - 1} TER{trajet.etapes.length > 2 ? "s" : ""} d'affilée
+                    {trajet.etapes.length - 1} TER d'affilée
                   </span>
                 </div>
                 <ol className="mt-8 space-y-0">

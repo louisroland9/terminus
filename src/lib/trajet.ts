@@ -70,8 +70,11 @@ export function tirerTrajet(depart: number): Trajet {
     etapes.push({ gare: GARES[cur], arrivee: fmt(t), attente });
     if (attente) t += attente;
   }
+  const fin = etapes[etapes.length - 1];
+  if (fin.attente) t -= fin.attente;
+  etapes[etapes.length - 1].attente = undefined;
   const depts = [...new Set(etapes.map((e) => e.gare.dept))];
-  return { etapes, duree: t - t0 - (etapes[etapes.length - 1].attente ?? 0), distance: Math.round(distance), depts };
+  return { etapes, duree: t - t0, distance: Math.round(distance), depts };
 }
 
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[-']/g, " ");

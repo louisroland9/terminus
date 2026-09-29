@@ -1,28 +1,16 @@
-# French TER Adventures
+# Terminus
 
-Créé moi un site web qui permet aux utilisateurs de planifier un trajet ter aléatoire à partir d'une gare.. Le but étant de promouvoir les lignes de trains régionales de France.
-- on doit pouvoir taper dans la barre de recherche pour la gare de départ
-- il faut toutes les gares TER
-- il peut y avoir des correspondances (plusieurs TER d'affilés)
-- la page doit être plus originale, marrante et épurée
+Application web permettant de tirer un trajet TER aléatoire à partir d'une gare et de redécouvrir les lignes régionales françaises.
 
-This project was built with [Lovable](https://lovable.dev).
+## Développement
 
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/2bed6905-121a-43e5-bd11-1f433eb1dee0).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Prérequis : [Bun](https://bun.sh/).
 
 ```sh
 git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+cd terminus
+bun install
+bun run dev
 ```
+
+Commandes disponibles : `bun run build`, `bun run preview` et `bun run lint`.

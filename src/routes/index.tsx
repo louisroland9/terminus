@@ -49,7 +49,7 @@ function Index() {
     setRoule(true); setTrajet(null);
     let i = 0;
     timer.current = window.setInterval(() => {
-      setFlash(GARES[Math.floor(Math.random() * GARES.length)].nom);
+      setFlash(GARES[Math.floor(Math.random() * GARES.length)]!.nom);
       if (++i > 18) {
         clearInterval(timer.current!);
         setTrajet(tirerTrajet(g.id));

@@ -6,11 +6,12 @@ export const GARES: Gare[] = (data.s as [string, string, number, number][]).map(
 );
 const LIGNES = data.l as number[][];
 
+const G = (i: number): Gare => GARES[i]!;
 const voisinsLigne: number[][] = GARES.map(() => []);
 LIGNES.forEach((l) =>
   l.forEach((g, i) => {
-    if (i > 0) voisinsLigne[g].push(l[i - 1]);
-    if (i < l.length - 1) voisinsLigne[g].push(l[i + 1]);
+    if (i > 0) voisinsLigne[g]!.push(l[i - 1]!);
+    if (i < l.length - 1) voisinsLigne[g]!.push(l[i + 1]!);
   }),
 );
 
@@ -22,9 +23,9 @@ export function km(a: Gare, b: Gare) {
 }
 
 function voisins(g: number): number[] {
-  const set = new Set(voisinsLigne[g]);
+  const set = new Set(voisinsLigne[g]!);
   const proches = GARES.filter((x) => x.id !== g)
-    .map((x) => [x.id, km(GARES[g], x)] as const)
+    .map((x) => [x.id, km(G(g), x)] as const)
     .filter(([, d]) => d < 45)
     .sort((a, b) => a[1] - b[1])
     .slice(0, 4);
@@ -46,7 +47,7 @@ export function tirerTrajet(depart: number): Trajet {
   let t = rnd(6 * 60, 14 * 60);
   const t0 = t;
   let distance = 0;
-  const etapes: Etape[] = [{ gare: GARES[depart] }];
+  const etapes: Etape[] = [{ gare: G(depart) }];
   for (let k = 0; k < nbTrains; k++) {
     const hops = rnd(2, 7);
     let d = 0, arrets = 0, prev = cur;
@@ -54,25 +55,25 @@ export function tirerTrajet(depart: number): Trajet {
       const opts = voisins(cur).filter((v) => !vus.has(v));
       if (!opts.length) break;
       // préférer s'éloigner du point de départ
-      opts.sort((a, b) => km(GARES[depart], GARES[b]) - km(GARES[depart], GARES[a]));
-      const next = opts[Math.min(opts.length - 1, rnd(0, 1))];
-      d += km(GARES[cur], GARES[next]);
+      opts.sort((a, b) => km(G(depart), G(b)) - km(G(depart), G(a)));
+      const next = opts[Math.min(opts.length - 1, rnd(0, 1))]!;
+      d += km(G(cur), G(next));
       vus.add(next); cur = next; arrets++;
     }
     if (cur === prev) break;
     const trajetMin = Math.round((d / 75) * 60 + arrets * 2) + 5;
-    const last = etapes[etapes.length - 1];
+    const last = etapes[etapes.length - 1]!;
     last.depart = fmt(t);
     last.train = `TER ${rnd(800, 899)}${rnd(10, 99)}`;
     last.arrets = arrets;
     t += trajetMin; distance += d;
     const attente = k < nbTrains - 1 ? rnd(6, 35) : undefined;
-    etapes.push({ gare: GARES[cur], arrivee: fmt(t), attente });
+    etapes.push({ gare: G(cur), arrivee: fmt(t), attente });
     if (attente) t += attente;
   }
-  const fin = etapes[etapes.length - 1];
+  const fin = etapes[etapes.length - 1]!;
   if (fin.attente) t -= fin.attente;
-  etapes[etapes.length - 1].attente = undefined;
+  etapes[etapes.length - 1]!.attente = undefined;
   const depts = [...new Set(etapes.map((e) => e.gare.dept))];
   return { etapes, duree: t - t0, distance: Math.round(distance), depts };
 }
@@ -84,8 +85,8 @@ export function chercher(q: string, n = 7): Gare[] {
   if (!nq) return [];
   const debut: Gare[] = [], dedans: Gare[] = [];
   INDEX.forEach((s, i) => {
-    if (s.startsWith(nq)) debut.push(GARES[i]);
-    else if (s.includes(nq)) dedans.push(GARES[i]);
+    if (s.startsWith(nq)) debut.push(G(i));
+    else if (s.includes(nq)) dedans.push(G(i));
   });
   return [...debut, ...dedans].slice(0, n);
 }

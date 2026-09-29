@@ -5,9 +5,9 @@ import { GARES, chercher, duree, tirerTrajet, type Gare, type Trajet } from "@/l
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "TER Roulette — un trajet TER au pif depuis ta gare" },
+      { title: "Terminus — un trajet TER au pif depuis ta gare" },
       { name: "description", content: "Choisis une gare, tire un trajet TER aléatoire avec correspondances et redécouvre les lignes régionales de France." },
-      { property: "og:title", content: "TER Roulette — un trajet TER au pif" },
+      { property: "og:title", content: "Terminus — un trajet TER au pif" },
       { property: "og:description", content: "Une gare, un tirage, une aventure régionale. Les petites lignes françaises n'attendent que toi." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -73,7 +73,7 @@ function Index() {
 
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 pt-6">
         <div className="brut -rotate-2 rounded-xl bg-card px-4 py-2 font-display text-lg">
-          TER<span className="text-primary">·</span>ROULETTE
+          TERMINUS
         </div>
         <div className="hidden rotate-3 rounded-full brut bg-pop px-4 py-1.5 font-mono text-xs font-bold sm:block">
           {GARES.length.toLocaleString("fr-FR")} gares dans le chapeau

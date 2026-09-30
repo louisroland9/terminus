@@ -112,7 +112,7 @@ function Index() {
             <span className="-rotate-12">AU<br />PIF<br />TOTAL</span>
           </div>
           <div className="absolute right-4 top-16 hidden animate-wobble text-7xl md:block" aria-hidden>🎲</div>
-          <h1 className="font-display text-[clamp(2.6rem,9vw,7.5rem)] uppercase leading-[0.9] tracking-tight">
+          <h1 className="font-display text-[clamp(2.6rem,9vw,7.5rem)] uppercase leading-[0.9] tracking-tight" style={{ wordSpacing: "-0.3em" }}>
             Tu montes,
             <br />
             <span className="inline-block -rotate-2 rounded-2xl brut-lg bg-primary px-4 text-primary-foreground">on verra</span>

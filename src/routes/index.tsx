@@ -33,10 +33,12 @@ function Index() {
   const [flash, setFlash] = useState("");
   const [n, setN] = useState(0);
   const [retour, setRetour] = useState(() => {
-    const demain = new Date();
-    demain.setDate(demain.getDate() + 1);
-    demain.setHours(20, 0, 0, 0);
-    return { jour: valeurDate(demain), heure: valeurHeure(demain) };
+    const deadline = new Date(Date.now() + 4 * 60 * 60 * 1000);
+    if (deadline.getMinutes() || deadline.getSeconds() || deadline.getMilliseconds()) {
+      deadline.setHours(deadline.getHours() + 1);
+    }
+    deadline.setMinutes(0, 0, 0);
+    return { jour: valeurDate(deadline), heure: valeurHeure(deadline) };
   });
   const [erreurRetour, setErreurRetour] = useState("");
   const res = useMemo(() => chercher(q), [q]);

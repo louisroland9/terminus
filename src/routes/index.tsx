@@ -77,6 +77,14 @@ function Index() {
   };
 
   const gareDepart = trajet?.etapesAller[0]?.gare;
+  const deadlineFormatee = trajet?.dateLimiteRetour.toLocaleString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const autresTrajetsAvantDeadline = Math.max(0, (trajet?.possibilitesAvantRetour ?? 1) - 1);
 
   return (
     <div className="min-h-screen overflow-x-hidden">
@@ -234,10 +242,10 @@ function Index() {
                   </div>
                   <p className="mt-5 font-display text-2xl leading-tight">Retour à {gareDepart.nom}</p>
                   <p className="mt-2 font-mono text-xs">
-                    Deadline : {trajet.dateLimiteRetour.toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    Dernier trajet avant {deadlineFormatee}
                   </p>
                   <p className="mt-3 rounded-lg bg-black/10 px-3 py-2 text-sm font-bold">
-                    {trajet.possibilitesAvantRetour} trajet{trajet.possibilitesAvantRetour === 1 ? "" : "s"} simulé{trajet.possibilitesAvantRetour === 1 ? "" : "s"} arrive{trajet.possibilitesAvantRetour === 1 ? "" : "nt"} au plus tard à la deadline, dont celui-ci.
+                    {autresTrajetsAvantDeadline} autres trajets arrivent avant {deadlineFormatee}
                   </p>
                   <div className="mt-6 border-t border-current/30 pt-6">
                     <ListeEtapes etapes={trajet.etapesRetour} retour />

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { GARES, chercher, duree, tirerAllerRetour, type Etape, type Gare, type TrajetAllerRetour } from "@/lib/trajet";
+import { proposerTrajetAvecHorairesReels } from "@/lib/horaires";
+import { GARES, chercher, duree, type Etape, type Gare, type TrajetAllerRetour } from "@/lib/trajet";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -67,13 +68,26 @@ function Index() {
       setFlash(GARES[Math.floor(Math.random() * GARES.length)]!.nom);
       if (++i > 18) {
         clearInterval(timer.current!);
-        const proposition = tirerAllerRetour(g.id, departLe, retourAvant);
-        setTrajet(proposition);
-        if (!proposition) {
-          setErreurRetour("Aucun aller-retour trouvé avant cette échéance. Essaie une heure ou une date plus tardive.");
-        }
-        setN((x) => x + 1);
-        setRoule(false);
+        setFlash("Recherche des horaires SNCF réels…");
+        void proposerTrajetAvecHorairesReels({
+          data: {
+            gareDepartId: g.id,
+            departLe: departLe.toISOString(),
+            retourAvant: retourAvant.toISOString(),
+          },
+        })
+          .then((proposition) => {
+            setTrajet(proposition);
+            if (!proposition) {
+              setErreurRetour("Aucun aller-retour SNCF trouvé pour cette gare avant la deadline.");
+            }
+            setN((x) => x + 1);
+          })
+          .catch((error: unknown) => {
+            console.error(error);
+            setErreurRetour("Impossible de charger les horaires SNCF. Réessaie dans un instant.");
+          })
+          .finally(() => setRoule(false));
       }
     }, 70);
   };
@@ -188,7 +202,7 @@ function Index() {
               </label>
             </div>
             {erreurRetour && <p role="alert" className="mx-auto mt-4 max-w-md text-sm font-bold text-destructive">{erreurRetour}</p>}
-            <p className="mt-2 text-center font-mono text-xs text-muted-foreground">Départ estimé dans 5 min · horaires fictifs</p>
+            <p className="mt-2 text-center font-mono text-xs text-muted-foreground">Prochain TER disponible · horaires théoriques SNCF, retards non inclus</p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {["Morlaix", "Briançon", "Mende", "Carhaix", "Saint-Flour"].map((s) => (
                 <button key={s} onClick={() => { const g = chercher(s, 1)[0]; if (g) choisir(g); }}
@@ -227,7 +241,7 @@ function Index() {
                       Aller · billet n°{String(n).padStart(3, "0")}
                     </span>
                     <span className="-rotate-3 rounded-lg brut bg-pop px-3 py-1 font-display text-sm">
-                      {trajet.etapesAller.length - 1} TER d'affilée
+                      {trajet.etapesAller.filter((etape) => etape.train).length} TER d'affilée
                     </span>
                   </div>
                   <ListeEtapes etapes={trajet.etapesAller} />
@@ -236,7 +250,7 @@ function Index() {
                 <article className="animate-pop-in rounded-3xl brut-lg bg-primary p-6 text-primary-foreground sm:p-8" style={{ animationDelay: "150ms" }}>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <span className="rounded-full bg-black/10 px-3 py-1 font-mono text-xs font-bold uppercase">
-                      Retour · {trajet.etapesRetour.length - 1} TER
+                      Retour · {trajet.etapesRetour.filter((etape) => etape.train).length} TER
                     </span>
                     <span className="font-mono text-xs font-bold uppercase tracking-widest">
                       Au plus près de la deadline
@@ -271,7 +285,7 @@ function Index() {
                   rel="noreferrer"
                   className="press rounded-2xl brut bg-secondary py-4 text-center font-bold text-secondary-foreground"
                 >
-                  Vérifier les vrais horaires ↗
+                  Vérifier sur SNCF Connect ↗
                 </a>
               </aside>
             </div>
@@ -280,7 +294,7 @@ function Index() {
       </main>
 
       <footer className="border-t-[3px] bg-card px-5 py-6 text-center font-mono text-xs">
-        Itinéraires imaginés au hasard sur de vraies gares — horaires fictifs, à confirmer avant de partir. Vive les petites lignes ! 🚂
+        Horaires théoriques : <a className="underline" href="https://transport.data.gouv.fr/datasets/horaires-sncf" target="_blank" rel="noreferrer">Open Data SNCF (ODbL)</a> — retards non inclus. Confirme les horaires sur SNCF Connect avant le départ. 🚂
       </footer>
     </div>
   );
@@ -312,12 +326,17 @@ function ListeEtapes({ etapes, retour = false }: { etapes: Etape[]; retour?: boo
               <p className={`text-sm ${teinteSecondaire}`}>{etape.gare.dept}</p>
               {etape.attente && (
                 <p className="mt-1 inline-block rounded bg-black/10 px-2 font-mono text-xs font-bold">
-                  ☕ {etape.attente} min {etape.retour ? "de pause avant le retour" : "pour un café en gare"}
+                  ☕ {etape.attente} min de correspondance
+                </p>
+              )}
+              {etape.marcheVers && etape.marcheMinutes !== undefined && (
+                <p className="mt-1 inline-block rounded bg-black/10 px-2 font-mono text-xs font-bold">
+                  🚶 {etape.marcheMinutes} min à pied jusqu'à {etape.marcheVers}
                 </p>
               )}
               {etape.train && (
                 <p className="mt-2 inline-block rounded-lg border-2 border-dashed px-2 py-0.5 font-mono text-xs font-bold">
-                  🚃 {etape.train} · {etape.arrets} arrêt{etape.arrets! > 1 ? "s" : ""}
+                  🚃 {etape.train}
                 </p>
               )}
             </div>

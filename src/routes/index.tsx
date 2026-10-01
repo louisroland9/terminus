@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { GARES, chercher, duree, tirerTrajet, type Gare, type Trajet } from "@/lib/trajet";
+import { proposerTrajetAvecHorairesReels } from "@/lib/horaires";
+import { GARES, chercher, duree, type Etape, type Gare, type TrajetAllerRetour } from "@/lib/trajet";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -16,25 +17,31 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const BLAGUES = [
-  "Destination : là où la baguette est encore tiède",
-  "Aucun avion n'a été blessé pendant ce tirage",
-  "Le contrôleur ne sait pas non plus où tu vas",
-  "Prends un sandwich, on ne promet rien",
-  "Correspondance ratée = aventure bonus",
-  "Ta tante habite peut-être par là",
-];
 const MARQUEE = "PETITES LIGNES ★ GRANDES AVENTURES ★ TCHOU TCHOU ★ ZÉRO PLAN ★ 100% RÉGIONAL ★ ";
+
+const valeurDate = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const valeurHeure = (date: Date) =>
+  `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 
 function Index() {
   const [q, setQ] = useState("");
   const [gare, setGare] = useState<Gare | null>(null);
   const [open, setOpen] = useState(false);
   const [hl, setHl] = useState(0);
-  const [trajet, setTrajet] = useState<Trajet | null>(null);
+  const [trajet, setTrajet] = useState<TrajetAllerRetour | null>(null);
   const [roule, setRoule] = useState(false);
   const [flash, setFlash] = useState("");
   const [n, setN] = useState(0);
+  const [retour, setRetour] = useState(() => {
+    const deadline = new Date(Date.now() + 4 * 60 * 60 * 1000);
+    if (deadline.getMinutes() || deadline.getSeconds() || deadline.getMilliseconds()) {
+      deadline.setHours(deadline.getHours() + 1);
+    }
+    deadline.setMinutes(0, 0, 0);
+    return { jour: valeurDate(deadline), heure: valeurHeure(deadline) };
+  });
+  const [erreurRetour, setErreurRetour] = useState("");
   const res = useMemo(() => chercher(q), [q]);
   const timer = useRef<number | null>(null);
 
@@ -45,22 +52,55 @@ function Index() {
   const tirer = () => {
     const g = gare ?? res[0];
     if (!g) return;
+    const departLe = new Date();
+    departLe.setSeconds(0, 0);
+    departLe.setMinutes(departLe.getMinutes() + 5);
+    const retourAvant = new Date(`${retour.jour}T${retour.heure}`);
+    if (Number.isNaN(retourAvant.getTime()) || retourAvant <= departLe) {
+      setErreurRetour("Choisis une échéance située après le départ estimé.");
+      return;
+    }
     if (!gare) choisir(g);
+    setErreurRetour("");
     setRoule(true); setTrajet(null);
     let i = 0;
     timer.current = window.setInterval(() => {
       setFlash(GARES[Math.floor(Math.random() * GARES.length)]!.nom);
       if (++i > 18) {
         clearInterval(timer.current!);
-        setTrajet(tirerTrajet(g.id));
-        setN((x) => x + 1);
-        setRoule(false);
+        setFlash("Recherche des horaires SNCF réels…");
+        void proposerTrajetAvecHorairesReels({
+          data: {
+            gareDepartId: g.id,
+            departLe: departLe.toISOString(),
+            retourAvant: retourAvant.toISOString(),
+          },
+        })
+          .then((proposition) => {
+            setTrajet(proposition);
+            if (!proposition) {
+              setErreurRetour("Aucun aller-retour SNCF trouvé pour cette gare avant la deadline.");
+            }
+            setN((x) => x + 1);
+          })
+          .catch((error: unknown) => {
+            console.error(error);
+            setErreurRetour("Impossible de charger les horaires SNCF. Réessaie dans un instant.");
+          })
+          .finally(() => setRoule(false));
       }
     }, 70);
   };
 
-  const blague = useMemo(() => BLAGUES[n % BLAGUES.length], [n]);
-  const arrivee = trajet?.etapes[trajet.etapes.length - 1];
+  const gareDepart = trajet?.etapesAller[0]?.gare;
+  const deadlineFormatee = trajet?.dateLimiteRetour.toLocaleString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const autresTrajetsAvantDeadline = Math.max(0, (trajet?.possibilitesAvantRetour ?? 1) - 1);
 
   return (
     <div className="min-h-screen overflow-x-hidden">
@@ -86,7 +126,7 @@ function Index() {
             <span className="-rotate-12">AU<br />PIF<br />TOTAL</span>
           </div>
           <div className="absolute right-4 top-16 hidden animate-wobble text-7xl md:block" aria-hidden>🎲</div>
-          <h1 className="font-display text-[clamp(2.6rem,9vw,7.5rem)] uppercase leading-[0.9] tracking-tight">
+          <h1 className="font-display text-[clamp(2.6rem,9vw,7.5rem)] uppercase leading-[0.9] tracking-tight" style={{ wordSpacing: "-0.3em" }}>
             Tu montes,
             <br />
             <span className="inline-block -rotate-2 rounded-2xl brut-lg bg-primary px-4 text-primary-foreground">on verra</span>
@@ -139,6 +179,30 @@ function Index() {
                 {roule ? "Ça tourne…" : "Tirer ! 🎰"}
               </button>
             </div>
+            <div className="mx-auto mt-5 grid max-w-md grid-cols-2 gap-3 text-left">
+              <label className="font-mono text-xs font-bold uppercase">
+                Être rentré le
+                <input
+                  type="date"
+                  value={retour.jour}
+                  min={valeurDate(new Date())}
+                  onChange={(event) => { setRetour((value) => ({ ...value, jour: event.target.value })); setErreurRetour(""); }}
+                  className="mt-1 w-full rounded-xl brut bg-card px-3 py-3 text-sm font-bold outline-none"
+                />
+              </label>
+              <label className="font-mono text-xs font-bold uppercase">
+                Avant
+                <input
+                  type="time"
+                  value={retour.heure}
+                  min={retour.jour === valeurDate(new Date()) ? valeurHeure(new Date()) : undefined}
+                  onChange={(event) => { setRetour((value) => ({ ...value, heure: event.target.value })); setErreurRetour(""); }}
+                  className="mt-1 w-full rounded-xl brut bg-card px-3 py-3 text-sm font-bold outline-none"
+                />
+              </label>
+            </div>
+            {erreurRetour && <p role="alert" className="mx-auto mt-4 max-w-md text-sm font-bold text-destructive">{erreurRetour}</p>}
+            <p className="mt-2 text-center font-mono text-xs text-muted-foreground">Prochain TER disponible · horaires théoriques SNCF, retards non inclus</p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {["Morlaix", "Briançon", "Mende", "Carhaix", "Saint-Flour"].map((s) => (
                 <button key={s} onClick={() => { const g = chercher(s, 1)[0]; if (g) choisir(g); }}
@@ -168,61 +232,46 @@ function Index() {
             </div>
           )}
 
-          {trajet && arrivee && !roule && (
+          {trajet && gareDepart && !roule && (
             <div key={n} className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1fr_320px]">
-              <div className="animate-pop-in rounded-3xl brut-lg bg-card p-6 sm:p-8">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="rounded-full bg-foreground px-3 py-1 font-mono text-xs font-bold uppercase text-background">
-                    Billet n°{String(n).padStart(3, "0")}
-                  </span>
-                  <span className="-rotate-3 rounded-lg brut bg-pop px-3 py-1 font-display text-sm">
-                    {trajet.etapes.length - 1} TER d'affilée
-                  </span>
-                </div>
-                <ol className="mt-8 space-y-0">
-                  {trajet.etapes.map((e, i) => {
-                    const first = i === 0, last = i === trajet.etapes.length - 1;
-                    return (
-                      <li key={i} className="relative flex gap-4 pb-6 last:pb-0" style={{ animationDelay: `${i * 120}ms` }}>
-                        {!last && <span className="absolute left-[15px] top-8 bottom-0 w-[4px] bg-[repeating-linear-gradient(var(--foreground)_0_8px,transparent_8px_14px)]" />}
-                        <span className={`relative z-10 grid size-8 shrink-0 place-items-center rounded-full border-[3px] text-sm ${first ? "bg-pop" : last ? "bg-primary" : "bg-accent"}`}>
-                          {first ? "🏁" : last ? "🎯" : "🔁"}
-                        </span>
-                        <div className="flex-1">
-                          <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <p className="text-xl font-bold leading-tight">{e.gare.nom}</p>
-                            <p className="font-mono text-sm font-bold">
-                              {e.arrivee && <span>arr. {e.arrivee}</span>}
-                              {e.arrivee && e.depart && " · "}
-                              {e.depart && <span className="text-primary">dép. {e.depart}</span>}
-                            </p>
-                          </div>
-                          <p className="text-sm text-muted-foreground">{e.gare.dept}</p>
-                          {e.attente && (
-                            <p className="mt-1 inline-block rounded bg-background px-2 font-mono text-xs font-bold">
-                              ☕ {e.attente} min pour un café en gare
-                            </p>
-                          )}
-                          {e.train && (
-                            <p className="mt-2 inline-block rounded-lg border-2 border-dashed px-2 py-0.5 font-mono text-xs font-bold">
-                              🚃 {e.train} · {e.arrets} arrêt{e.arrets! > 1 ? "s" : ""}
-                            </p>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
+              <div className="flex min-w-0 flex-col gap-6">
+                <article className="animate-pop-in rounded-3xl brut-lg bg-card p-6 sm:p-8">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span className="rounded-full bg-foreground px-3 py-1 font-mono text-xs font-bold uppercase text-background">
+                      Aller · billet n°{String(n).padStart(3, "0")}
+                    </span>
+                    <span className="-rotate-3 rounded-lg brut bg-pop px-3 py-1 font-display text-sm">
+                      {trajet.etapesAller.filter((etape) => etape.train).length} TER d'affilée
+                    </span>
+                  </div>
+                  <ListeEtapes etapes={trajet.etapesAller} />
+                </article>
+
+                <article className="animate-pop-in rounded-3xl brut-lg bg-primary p-6 text-primary-foreground sm:p-8" style={{ animationDelay: "150ms" }}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span className="rounded-full bg-black/10 px-3 py-1 font-mono text-xs font-bold uppercase">
+                      Retour · {trajet.etapesRetour.filter((etape) => etape.train).length} TER
+                    </span>
+                    <span className="font-mono text-xs font-bold uppercase tracking-widest">
+                      Au plus près de la deadline
+                    </span>
+                  </div>
+                  <p className="mt-5 font-display text-2xl leading-tight">Retour à {gareDepart.nom}</p>
+                  <p className="mt-2 font-mono text-xs">
+                    Dernier trajet avant {deadlineFormatee}
+                  </p>
+                  <p className="mt-3 rounded-lg bg-black/10 px-3 py-2 text-sm font-bold">
+                    {autresTrajetsAvantDeadline} autres trajets arrivent avant {deadlineFormatee}
+                  </p>
+                  <div className="mt-6 border-t border-current/30 pt-6">
+                    <ListeEtapes etapes={trajet.etapesRetour} retour />
+                  </div>
+                </article>
               </div>
 
               <aside className="flex flex-col gap-5">
-                <div className="animate-pop-in rotate-2 rounded-3xl brut bg-primary p-6 text-primary-foreground" style={{ animationDelay: "150ms" }}>
-                  <p className="font-mono text-xs uppercase tracking-widest">Tu finis à</p>
-                  <p className="mt-2 font-display text-2xl leading-tight">{arrivee.gare.nom}</p>
-                  <p className="mt-4 text-sm font-medium">{blague}</p>
-                </div>
                 <div className="animate-pop-in -rotate-1 grid grid-cols-2 gap-3 rounded-3xl brut bg-card p-5" style={{ animationDelay: "250ms" }}>
-                  <Stat label="Durée" value={duree(trajet.duree)} />
+                  <Stat label="Durée aller-retour" value={duree(trajet.duree)} />
                   <Stat label="Distance" value={`${trajet.distance} km`} />
                   <Stat label="Départements" value={String(trajet.depts.length)} />
                   <Stat label="CO₂ vs voiture" value="÷ 30 🌱" />
@@ -236,7 +285,7 @@ function Index() {
                   rel="noreferrer"
                   className="press rounded-2xl brut bg-secondary py-4 text-center font-bold text-secondary-foreground"
                 >
-                  Vérifier les vrais horaires ↗
+                  Vérifier sur SNCF Connect ↗
                 </a>
               </aside>
             </div>
@@ -245,9 +294,56 @@ function Index() {
       </main>
 
       <footer className="border-t-[3px] bg-card px-5 py-6 text-center font-mono text-xs">
-        Itinéraires imaginés au hasard sur de vraies gares — horaires fictifs, à confirmer avant de partir. Vive les petites lignes ! 🚂
+        Horaires théoriques : <a className="underline" href="https://transport.data.gouv.fr/datasets/horaires-sncf" target="_blank" rel="noreferrer">Open Data SNCF (ODbL)</a> — retards non inclus. Confirme les horaires sur SNCF Connect avant le départ. 🚂
       </footer>
     </div>
+  );
+}
+
+function ListeEtapes({ etapes, retour = false }: { etapes: Etape[]; retour?: boolean }) {
+  return (
+    <ol className="space-y-0">
+      {etapes.map((etape, index) => {
+        const premiere = index === 0;
+        const derniere = index === etapes.length - 1;
+        const teinteSecondaire = retour ? "text-primary-foreground/70" : "text-muted-foreground";
+
+        return (
+          <li key={`${etape.gare.id}-${index}`} className="relative flex gap-4 pb-6 last:pb-0" style={{ animationDelay: `${index * 120}ms` }}>
+            {!derniere && <span className="absolute left-[15px] top-8 bottom-0 w-[4px] bg-[repeating-linear-gradient(var(--foreground)_0_8px,transparent_8px_14px)]" />}
+            <span className={`relative z-10 grid size-8 shrink-0 place-items-center rounded-full border-[3px] text-sm ${premiere ? "bg-pop" : derniere ? "bg-primary" : "bg-accent"}`}>
+              {premiere ? (retour ? "↩" : "🏁") : derniere ? (retour ? "🏁" : "🎯") : "🔁"}
+            </span>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-xl font-bold leading-tight">{etape.gare.nom}</p>
+                <p className="font-mono text-sm font-bold">
+                  {etape.arrivee && <span>arr. {etape.arrivee}</span>}
+                  {etape.arrivee && etape.depart && " · "}
+                  {etape.depart && <span className={retour ? "text-primary-foreground" : "text-primary"}>dép. {etape.depart}</span>}
+                </p>
+              </div>
+              <p className={`text-sm ${teinteSecondaire}`}>{etape.gare.dept}</p>
+              {etape.attente && (
+                <p className="mt-1 inline-block rounded bg-black/10 px-2 font-mono text-xs font-bold">
+                  ☕ {etape.attente} min de correspondance
+                </p>
+              )}
+              {etape.marcheVers && etape.marcheMinutes !== undefined && (
+                <p className="mt-1 inline-block rounded bg-black/10 px-2 font-mono text-xs font-bold">
+                  🚶 {etape.marcheMinutes} min à pied jusqu'à {etape.marcheVers}
+                </p>
+              )}
+              {etape.train && (
+                <p className="mt-2 inline-block rounded-lg border-2 border-dashed px-2 py-0.5 font-mono text-xs font-bold">
+                  🚃 {etape.train}
+                </p>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

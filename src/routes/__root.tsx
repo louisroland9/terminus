@@ -74,7 +74,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Terminus" },
-      { name: "description", content: "Des trajets TER aléatoires pour redécouvrir les lignes régionales." },
+      {
+        name: "description",
+        content: "Des trajets TER aléatoires pour redécouvrir les lignes régionales.",
+      },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },

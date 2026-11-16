@@ -1,15 +1,30 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { proposerTrajetAvecHorairesReels } from "@/lib/horaires";
-import { GARES, chercher, duree, type Etape, type Gare, type TrajetAllerRetour } from "@/lib/trajet";
+import {
+  GARES,
+  chercher,
+  duree,
+  type Etape,
+  type Gare,
+  type TrajetAllerRetour,
+} from "@/lib/trajet";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Terminus — un trajet TER au pif depuis ta gare" },
-      { name: "description", content: "Choisis une gare, tire un trajet TER aléatoire avec correspondances et redécouvre les lignes régionales de France." },
+      {
+        name: "description",
+        content:
+          "Choisis une gare, tire un trajet TER aléatoire avec correspondances et redécouvre les lignes régionales de France.",
+      },
       { property: "og:title", content: "Terminus — un trajet TER au pif" },
-      { property: "og:description", content: "Une gare, un tirage, une aventure régionale. Les petites lignes françaises n'attendent que toi." },
+      {
+        property: "og:description",
+        content:
+          "Une gare, un tirage, une aventure régionale. Les petites lignes françaises n'attendent que toi.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -45,9 +60,18 @@ function Index() {
   const res = useMemo(() => chercher(q), [q]);
   const timer = useRef<number | null>(null);
 
-  useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
+  useEffect(
+    () => () => {
+      if (timer.current) clearInterval(timer.current);
+    },
+    [],
+  );
 
-  const choisir = (g: Gare) => { setGare(g); setQ(g.nom); setOpen(false); };
+  const choisir = (g: Gare) => {
+    setGare(g);
+    setQ(g.nom);
+    setOpen(false);
+  };
 
   const tirer = () => {
     const g = gare ?? res[0];
@@ -62,7 +86,8 @@ function Index() {
     }
     if (!gare) choisir(g);
     setErreurRetour("");
-    setRoule(true); setTrajet(null);
+    setRoule(true);
+    setTrajet(null);
     let i = 0;
     timer.current = window.setInterval(() => {
       setFlash(GARES[Math.floor(Math.random() * GARES.length)]!.nom);
@@ -107,7 +132,8 @@ function Index() {
       {/* bandeau défilant */}
       <div className="border-b-[3px] bg-secondary py-2 text-secondary-foreground">
         <div className="flex w-max animate-marquee font-display text-sm tracking-wider">
-          <span>{MARQUEE.repeat(4)}</span><span>{MARQUEE.repeat(4)}</span>
+          <span>{MARQUEE.repeat(4)}</span>
+          <span>{MARQUEE.repeat(4)}</span>
         </div>
       </div>
 
@@ -123,32 +149,65 @@ function Index() {
       <main className="mx-auto max-w-6xl px-5 pb-24">
         <section className="relative pt-12 text-center">
           <div className="absolute left-2 top-6 hidden size-28 animate-spin-slow place-items-center rounded-full brut bg-accent font-display text-[11px] leading-tight md:grid">
-            <span className="-rotate-12">AU<br />PIF<br />TOTAL</span>
+            <span className="-rotate-12">
+              AU
+              <br />
+              PIF
+              <br />
+              TOTAL
+            </span>
           </div>
-          <div className="absolute right-4 top-16 hidden animate-wobble text-7xl md:block" aria-hidden>🎲</div>
-          <h1 className="font-display text-[clamp(2.6rem,9vw,7.5rem)] uppercase leading-[0.9] tracking-tight" style={{ wordSpacing: "-0.3em" }}>
+          <div
+            className="absolute right-4 top-16 hidden animate-wobble text-7xl md:block"
+            aria-hidden
+          >
+            🎲
+          </div>
+          <h1
+            className="font-display text-[clamp(2.6rem,9vw,7.5rem)] uppercase leading-[0.9] tracking-tight"
+            style={{ wordSpacing: "-0.3em" }}
+          >
             Tu montes,
             <br />
-            <span className="inline-block -rotate-2 rounded-2xl brut-lg bg-primary px-4 text-primary-foreground">on verra</span>
+            <span className="inline-block -rotate-2 rounded-2xl brut-lg bg-primary px-4 text-primary-foreground">
+              on verra
+            </span>
           </h1>
           <p className="mx-auto mt-8 max-w-xl text-lg font-medium">
-            Tape ta gare, appuie sur le gros bouton, et laisse le hasard t'embarquer de TER en TER à travers la France des petites lignes. 🐄🚂🥖
+            Tape ta gare, appuie sur le gros bouton, et laisse le hasard t'embarquer de TER en TER à
+            travers la France des petites lignes. 🐄🚂🥖
           </p>
 
           {/* recherche */}
           <div className="relative mx-auto mt-10 max-w-2xl">
             <div className="flex flex-col gap-3 sm:flex-row">
               <div className="relative flex-1">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-2xl">📍</span>
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-2xl">
+                  📍
+                </span>
                 <input
                   value={q}
-                  onChange={(e) => { setQ(e.target.value); setGare(null); setOpen(true); setHl(0); }}
+                  onChange={(e) => {
+                    setQ(e.target.value);
+                    setGare(null);
+                    setOpen(true);
+                    setHl(0);
+                  }}
                   onFocus={() => setOpen(true)}
                   onBlur={() => setTimeout(() => setOpen(false), 150)}
                   onKeyDown={(e) => {
-                    if (e.key === "ArrowDown") { e.preventDefault(); setHl((h) => Math.min(h + 1, res.length - 1)); }
-                    if (e.key === "ArrowUp") { e.preventDefault(); setHl((h) => Math.max(h - 1, 0)); }
-                    if (e.key === "Enter") { if (open && res[hl]) choisir(res[hl]); else tirer(); }
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      setHl((h) => Math.min(h + 1, res.length - 1));
+                    }
+                    if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setHl((h) => Math.max(h - 1, 0));
+                    }
+                    if (e.key === "Enter") {
+                      if (open && res[hl]) choisir(res[hl]);
+                      else tirer();
+                    }
                   }}
                   placeholder="Ta gare de départ… (ex : Morlaix)"
                   aria-label="Gare de départ"
@@ -164,7 +223,9 @@ function Index() {
                           className={`flex w-full items-center justify-between px-5 py-3 text-left font-bold ${i === hl ? "bg-background" : ""}`}
                         >
                           <span>🚉 {g.nom}</span>
-                          <span className="font-mono text-xs uppercase text-muted-foreground">{g.dept}</span>
+                          <span className="font-mono text-xs uppercase text-muted-foreground">
+                            {g.dept}
+                          </span>
                         </button>
                       </li>
                     ))}
@@ -186,7 +247,10 @@ function Index() {
                   type="date"
                   value={retour.jour}
                   min={valeurDate(new Date())}
-                  onChange={(event) => { setRetour((value) => ({ ...value, jour: event.target.value })); setErreurRetour(""); }}
+                  onChange={(event) => {
+                    setRetour((value) => ({ ...value, jour: event.target.value }));
+                    setErreurRetour("");
+                  }}
                   className="mt-1 w-full rounded-xl brut bg-card px-3 py-3 text-sm font-bold outline-none"
                 />
               </label>
@@ -196,17 +260,32 @@ function Index() {
                   type="time"
                   value={retour.heure}
                   min={retour.jour === valeurDate(new Date()) ? valeurHeure(new Date()) : undefined}
-                  onChange={(event) => { setRetour((value) => ({ ...value, heure: event.target.value })); setErreurRetour(""); }}
+                  onChange={(event) => {
+                    setRetour((value) => ({ ...value, heure: event.target.value }));
+                    setErreurRetour("");
+                  }}
                   className="mt-1 w-full rounded-xl brut bg-card px-3 py-3 text-sm font-bold outline-none"
                 />
               </label>
             </div>
-            {erreurRetour && <p role="alert" className="mx-auto mt-4 max-w-md text-sm font-bold text-destructive">{erreurRetour}</p>}
-            <p className="mt-2 text-center font-mono text-xs text-muted-foreground">Prochain TER disponible · horaires théoriques SNCF, retards non inclus</p>
+            {erreurRetour && (
+              <p role="alert" className="mx-auto mt-4 max-w-md text-sm font-bold text-destructive">
+                {erreurRetour}
+              </p>
+            )}
+            <p className="mt-2 text-center font-mono text-xs text-muted-foreground">
+              Prochain TER disponible · horaires théoriques SNCF, retards non inclus
+            </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {["Morlaix", "Briançon", "Mende", "Carhaix", "Saint-Flour"].map((s) => (
-                <button key={s} onClick={() => { const g = chercher(s, 1)[0]; if (g) choisir(g); }}
-                  className="press rounded-full border-[3px] bg-card px-3 py-1 text-sm font-bold odd:rotate-2 even:-rotate-2">
+                <button
+                  key={s}
+                  onClick={() => {
+                    const g = chercher(s, 1)[0];
+                    if (g) choisir(g);
+                  }}
+                  className="press rounded-full border-[3px] bg-card px-3 py-1 text-sm font-bold odd:rotate-2 even:-rotate-2"
+                >
                   {s}
                 </button>
               ))}
@@ -218,7 +297,9 @@ function Index() {
         <section className="mt-16 min-h-[200px]">
           {roule && (
             <div className="mx-auto max-w-xl rounded-3xl brut-lg bg-secondary p-8 text-center text-secondary-foreground">
-              <p className="font-mono text-xs uppercase tracking-widest">Le chapeau magique cherche…</p>
+              <p className="font-mono text-xs uppercase tracking-widest">
+                Le chapeau magique cherche…
+              </p>
               <p className="mt-3 truncate font-display text-3xl">{flash}</p>
             </div>
           )}
@@ -247,7 +328,10 @@ function Index() {
                   <ListeEtapes etapes={trajet.etapesAller} />
                 </article>
 
-                <article className="animate-pop-in rounded-3xl brut-lg bg-primary p-6 text-primary-foreground sm:p-8" style={{ animationDelay: "150ms" }}>
+                <article
+                  className="animate-pop-in rounded-3xl brut-lg bg-primary p-6 text-primary-foreground sm:p-8"
+                  style={{ animationDelay: "150ms" }}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <span className="rounded-full bg-black/10 px-3 py-1 font-mono text-xs font-bold uppercase">
                       Retour · {trajet.etapesRetour.filter((etape) => etape.train).length} TER
@@ -256,10 +340,10 @@ function Index() {
                       Au plus près de la deadline
                     </span>
                   </div>
-                  <p className="mt-5 font-display text-2xl leading-tight">Retour à {gareDepart.nom}</p>
-                  <p className="mt-2 font-mono text-xs">
-                    Dernier trajet avant {deadlineFormatee}
+                  <p className="mt-5 font-display text-2xl leading-tight">
+                    Retour à {gareDepart.nom}
                   </p>
+                  <p className="mt-2 font-mono text-xs">Dernier trajet avant {deadlineFormatee}</p>
                   <p className="mt-3 rounded-lg bg-black/10 px-3 py-2 text-sm font-bold">
                     {autresTrajetsAvantDeadline} autres trajets arrivent avant {deadlineFormatee}
                   </p>
@@ -270,13 +354,19 @@ function Index() {
               </div>
 
               <aside className="flex flex-col gap-5">
-                <div className="animate-pop-in -rotate-1 grid grid-cols-2 gap-3 rounded-3xl brut bg-card p-5" style={{ animationDelay: "250ms" }}>
+                <div
+                  className="animate-pop-in -rotate-1 grid grid-cols-2 gap-3 rounded-3xl brut bg-card p-5"
+                  style={{ animationDelay: "250ms" }}
+                >
                   <Stat label="Durée aller-retour" value={duree(trajet.duree)} />
                   <Stat label="Distance" value={`${trajet.distance} km`} />
                   <Stat label="Départements" value={String(trajet.depts.length)} />
                   <Stat label="CO₂ vs voiture" value="÷ 30 🌱" />
                 </div>
-                <button onClick={tirer} className="press rounded-2xl brut bg-accent py-4 font-display uppercase">
+                <button
+                  onClick={tirer}
+                  className="press rounded-2xl brut bg-accent py-4 font-display uppercase"
+                >
                   Relancer 🔄
                 </button>
                 <a
@@ -294,7 +384,16 @@ function Index() {
       </main>
 
       <footer className="border-t-[3px] bg-card px-5 py-6 text-center font-mono text-xs">
-        Horaires théoriques : <a className="underline" href="https://transport.data.gouv.fr/datasets/horaires-sncf" target="_blank" rel="noreferrer">Open Data SNCF (ODbL)</a> — retards non inclus. Confirme les horaires sur SNCF Connect avant le départ. 🚂
+        Horaires théoriques :{" "}
+        <a
+          className="underline"
+          href="https://transport.data.gouv.fr/datasets/horaires-sncf"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open Data SNCF (ODbL)
+        </a>{" "}
+        — retards non inclus. Confirme les horaires sur SNCF Connect avant le départ. 🚂
       </footer>
     </div>
   );
@@ -309,9 +408,17 @@ function ListeEtapes({ etapes, retour = false }: { etapes: Etape[]; retour?: boo
         const teinteSecondaire = retour ? "text-primary-foreground/70" : "text-muted-foreground";
 
         return (
-          <li key={`${etape.gare.id}-${index}`} className="relative flex gap-4 pb-6 last:pb-0" style={{ animationDelay: `${index * 120}ms` }}>
-            {!derniere && <span className="absolute left-[15px] top-8 bottom-0 w-[4px] bg-[repeating-linear-gradient(var(--foreground)_0_8px,transparent_8px_14px)]" />}
-            <span className={`relative z-10 grid size-8 shrink-0 place-items-center rounded-full border-[3px] text-sm ${premiere ? "bg-pop" : derniere ? "bg-primary" : "bg-accent"}`}>
+          <li
+            key={`${etape.gare.id}-${index}`}
+            className="relative flex gap-4 pb-6 last:pb-0"
+            style={{ animationDelay: `${index * 120}ms` }}
+          >
+            {!derniere && (
+              <span className="absolute left-[15px] top-8 bottom-0 w-[4px] bg-[repeating-linear-gradient(var(--foreground)_0_8px,transparent_8px_14px)]" />
+            )}
+            <span
+              className={`relative z-10 grid size-8 shrink-0 place-items-center rounded-full border-[3px] text-sm ${premiere ? "bg-pop" : derniere ? "bg-primary" : "bg-accent"}`}
+            >
               {premiere ? (retour ? "↩" : "🏁") : derniere ? (retour ? "🏁" : "🎯") : "🔁"}
             </span>
             <div className="flex-1">
@@ -320,7 +427,11 @@ function ListeEtapes({ etapes, retour = false }: { etapes: Etape[]; retour?: boo
                 <p className="font-mono text-sm font-bold">
                   {etape.arrivee && <span>arr. {etape.arrivee}</span>}
                   {etape.arrivee && etape.depart && " · "}
-                  {etape.depart && <span className={retour ? "text-primary-foreground" : "text-primary"}>dép. {etape.depart}</span>}
+                  {etape.depart && (
+                    <span className={retour ? "text-primary-foreground" : "text-primary"}>
+                      dép. {etape.depart}
+                    </span>
+                  )}
                 </p>
               </div>
               <p className={`text-sm ${teinteSecondaire}`}>{etape.gare.dept}</p>
@@ -350,7 +461,9 @@ function ListeEtapes({ etapes, retour = false }: { etapes: Etape[]; retour?: boo
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p>
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        {label}
+      </p>
       <p className="font-display text-lg">{value}</p>
     </div>
   );

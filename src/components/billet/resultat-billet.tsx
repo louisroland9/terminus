@@ -1,7 +1,7 @@
 import { ListeEtapes } from "@/components/billet/liste-etapes";
 import { Stat } from "@/components/billet/stat";
 import { suivreEvenement } from "@/lib/analytics";
-import { duree, type TrajetAllerRetour } from "@/lib/trajet";
+import { co2EviteKg, duree, type TrajetAllerRetour } from "@/lib/trajet";
 
 type Props = { trajet: TrajetAllerRetour; numero: number; onRelancer: () => void };
 
@@ -63,7 +63,10 @@ export function ResultatBillet({ trajet, numero, onRelancer }: Props) {
           <Stat label="Durée aller-retour" value={duree(trajet.duree)} />
           <Stat label="Distance" value={`${trajet.distance} km`} />
           <Stat label="Départements" value={String(trajet.depts.length)} />
-          <Stat label="CO₂ vs voiture" value="÷ 30 🌱" />
+          <Stat
+            label="CO₂ évité vs voiture solo"
+            value={`≈ ${co2EviteKg(trajet.distance)} kg 🌱`}
+          />
         </div>
         <button
           onClick={onRelancer}

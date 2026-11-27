@@ -4,16 +4,18 @@ import { ListeEtapes } from "@/components/billet/liste-etapes";
 import { Stat } from "@/components/billet/stat";
 import { suivreEvenement } from "@/lib/analytics";
 import type { Billet } from "@/lib/billet";
+import { numeroBillet } from "@/lib/recap";
 import { co2EviteKg, duree, type TrajetAllerRetour } from "@/lib/trajet";
 
 type Props = {
   trajet: TrajetAllerRetour;
   billet: Billet;
   numero?: number;
+  departementsCarnet?: number | undefined;
   action: ReactNode;
 };
 
-export function ResultatBillet({ trajet, billet, numero, action }: Props) {
+export function ResultatBillet({ trajet, billet, numero, departementsCarnet, action }: Props) {
   const gareDepart = trajet.etapesAller[0]?.gare;
   const deadlineFormatee = trajet.dateLimiteRetour.toLocaleString("fr-FR", {
     weekday: "long",
@@ -31,10 +33,7 @@ export function ResultatBillet({ trajet, billet, numero, action }: Props) {
         <article className="animate-pop-in rounded-3xl brut-lg bg-card p-6 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="rounded-full bg-foreground px-3 py-1 font-mono text-xs font-bold uppercase text-background">
-              Aller ·{" "}
-              {numero === undefined
-                ? "billet partagé"
-                : `billet n°${String(numero).padStart(3, "0")}`}
+              Aller · {numero === undefined ? "billet partagé" : `billet n°${numeroBillet(numero)}`}
             </span>
             <span className="-rotate-3 rounded-lg brut bg-pop px-3 py-1 font-display text-sm">
               {trajet.etapesAller.filter((etape) => etape.train).length} TER d'affilée
@@ -79,7 +78,12 @@ export function ResultatBillet({ trajet, billet, numero, action }: Props) {
             value={`≈ ${co2EviteKg(trajet.distance)} kg 🌱`}
           />
         </div>
-        <BoutonPartager billet={billet} />
+        <BoutonPartager
+          billet={billet}
+          trajet={trajet}
+          numero={numero}
+          departementsCarnet={departementsCarnet}
+        />
         {action}
         <a
           href="https://www.sncf-connect.com/"

@@ -1,9 +1,12 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ResultatBillet } from "@/components/billet/resultat-billet";
+import { CarteCarnet } from "@/components/carnet/carte-carnet";
 import { Habillage } from "@/components/habillage";
+import { useCarnet } from "@/hooks/use-carnet";
 import { suivreEvenement } from "@/lib/analytics";
 import { encoderBillet, type Billet } from "@/lib/billet";
+import { departementsDebloques } from "@/lib/carnet";
 import { proposerTrajetAvecHorairesReels } from "@/lib/horaires";
 import { metaApercu } from "@/lib/seo";
 import { GARES, chercher, type Gare, type TrajetAllerRetour } from "@/lib/trajet";
@@ -54,10 +57,12 @@ function Index() {
   const [resultat, setResultat] = useState<{
     trajet: TrajetAllerRetour;
     billet: Billet;
+    numero: number;
+    departementsCarnet: number;
   } | null>(null);
   const [roule, setRoule] = useState(false);
   const [flash, setFlash] = useState("");
-  const [n, setN] = useState(0);
+  const { carnet, enregistrer } = useCarnet();
   const [retour, setRetour] = useState(() => {
     const deadline = new Date(Date.now() + 4 * 60 * 60 * 1000);
     if (deadline.getMinutes() || deadline.getSeconds() || deadline.getMilliseconds()) {
@@ -136,8 +141,13 @@ function Index() {
               departLe,
               retourAvant,
             };
-            setResultat({ trajet, billet });
-            setN((x) => x + 1);
+            const suivant = enregistrer(trajet);
+            setResultat({
+              trajet,
+              billet,
+              numero: suivant.billets,
+              departementsCarnet: departementsDebloques(suivant),
+            });
             afficherLienBillet(billet);
           })
           .catch((error: unknown) => {
@@ -320,10 +330,10 @@ function Index() {
 
           {resultat && !roule && (
             <ResultatBillet
-              key={n}
               trajet={resultat.trajet}
               billet={resultat.billet}
-              numero={n}
+              numero={resultat.numero}
+              departementsCarnet={resultat.departementsCarnet}
               action={
                 <button
                   onClick={tirer}
@@ -334,6 +344,8 @@ function Index() {
               }
             />
           )}
+
+          {!roule && carnet && carnet.billets > 0 && <CarteCarnet carnet={carnet} />}
         </section>
       </main>
     </Habillage>

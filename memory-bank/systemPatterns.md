@@ -5,7 +5,11 @@
 ```
 src/
   routes/__root.tsx      # layout racine unique (html/head/meta, QueryClientProvider, <Outlet />)
-  routes/index.tsx       # route `/` : toute l'UI de l'app
+  routes/index.tsx       # route `/` : formulaire de tirage et résultat
+  routes/t.$code.tsx     # billet partagé : meta OG en SSR, trajet calculé côté client
+  components/habillage.tsx, choix-mode.tsx
+  components/billet/*    # affichage du résultat et partage
+  components/carnet/*    # carte SVG des gares visitées
   server.ts              # entrée serveur (Nitro/h3) : normalise les 500 « swallowed »
   start.ts               # middleware erreur + csrfMiddleware (réinstallé explicitement)
   router.tsx             # getRouter() : QueryClient + createRouter(routeTree)
@@ -14,10 +18,15 @@ src/
     trajet.ts            # domaine PUR client : Gare/Etape/Trajet, km(), chercher(), GARES
     horaires.ts          # server function (createServerFn POST + zod)
     horaires.server.ts   # cœur serveur GTFS (cache, parseur, routeur)
+    billet.ts            # encodage base64url d'un tirage (validé par zod)
+    quotidien.ts         # fenêtre, graine et numéro du tirage du jour
+    hasard.ts            # PRNG semé + mélange
+    carnet.ts, recap.ts  # carnet localStorage, texte de partage
+    seo.ts, partage.ts, analytics.ts
     error-capture.ts     # capture out-of-band des Error + wrapper console.error
     error-page.ts        # rendu HTML d'erreur 500
     utils.ts             # cn()
-  hooks/use-mobile.tsx
+  hooks/use-mobile.tsx, use-carnet.ts
   components/ui/*        # shadcn (non édité)
   data/gares.json        # gares au format compact
 ```
@@ -33,10 +42,16 @@ src/
 `genererTrajetAvecHorairesReels(input)` :
 1. Conversion des dates en `Europe/Paris` (luxon), validation `retourAvant > departLe`.
 2. `obtenirContexte(departLe)` → contexte GTFS du jour (cache 12 h).
-3. Sélection de **destinations** : distance 20 km ≤ d ≤ rayon dépendant du temps dispo (min 350 km), mélange aléatoire, max 30 tentatives.
+3. Sélection de **destinations** : 20 km ≤ d ≤ `min(350 km, minutes disponibles × 1,1)`. Trois cas : `destinationId` imposée (billet partagé), `graine` (tirage du jour, toutes les candidates dans un ordre reproductible), sinon aléatoire avec 30 tentatives max.
 4. `Router.route(Query)` sur l'aller (train = mode `3`, ≤ 4 correspondances) ; vérifie que le trajet est bien un TER.
 5. `chercherRetours(...)` : `Router.rangeRoute(RangeQuery)` sur ≤ 7 jours, dédoublonnage par signature de legs.
 6. Choix du retour le plus tardif, assemblage des étapes (`construireEtapes`), calcul durée/distance/dépts.
+
+## Billet et URL
+
+- Après un tirage sur `/`, l'URL affiche `/t/$code` par **masquage de route** (`navigate({ mask, unmaskOnReload })`) ; `state.billet` force la mise à jour de l'historique.
+- `/t/$code` appelle la server function via `useQuery` (jamais en SSR), pour que les robots d'aperçu n'attendent pas le GTFS.
+- Les URL absolues des meta viennent de la requête (`createIsomorphicFn` dans `seo.ts`, `x-forwarded-host` pris en compte).
 
 ## Pattern de cache
 
@@ -62,7 +77,7 @@ src/
 
 - Tokens couleurs **oklch** dans `styles.css` (`--background` jaune fluo, `--primary` rouge tomate, `--secondary` bleu nuit, `--accent` rose, `--pop` turquoise…).
 - Utilitaires CSS custom : `brut`, `brut-lg`, `press` ; animations `animate-marquee`, `animate-wobble`, `animate-chug`, `animate-ride`, `animate-pop-in`, `animate-spin-slow`, `animate-shake`.
-- Composants UI shadcn consommés via `@/components/ui/*` et `cn()`. Composants locaux (`ListeEtapes`, `Stat`) définis dans le fichier de route.
+- Composants UI shadcn consommés via `@/components/ui/*` et `cn()`. Composants applicatifs dans `components/` (hors `ui/`).
 
 ## Conventions
 

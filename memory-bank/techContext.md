@@ -63,4 +63,4 @@
 - Runtime **Node.js compatible** requis.
 - **Répertoire temporaire inscriptible** obligatoire (`mkdtemp` pour le GTFS).
 - GTFS mis en cache **12 h** ; premier calcul d'une journée ≈ **20 s**.
-- Aucune variable d'environnement requise côté app (pas de `.env.example`).
+- Aucune variable d'environnement obligatoire. `VITE_PLAUSIBLE_DOMAIN` (facultative, voir `.env.example`) active Plausible ; elle est lue au **build**.

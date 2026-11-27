@@ -13,6 +13,7 @@ import {
 } from "minotor";
 import { GtfsParser, standardGtfsProfile, StraightLineTransferGenerator } from "minotor/parser";
 
+import { aleatoireSeme, melanger } from "./hasard";
 import { GARES, km, type Etape, type Gare, type TrajetAllerRetour } from "./trajet";
 
 const GTFS_URL =
@@ -25,7 +26,13 @@ const MAX_JOURS_RETOUR = 7;
 const CACHE_HORAIRES_MS = 12 * 60 * 60 * 1000;
 const modesTrain = new Set([3]);
 
-type DemandeTrajet = { gareDepartId: number; departLe: string; retourAvant: string };
+type DemandeTrajet = {
+  gareDepartId: number;
+  destinationId?: number | undefined;
+  graine?: string | undefined;
+  departLe: string;
+  retourAvant: string;
+};
 
 type GareGtfs = { gare: Gare; station: Stop; quais: Stop[] };
 type ContexteGtfs = {
@@ -270,15 +277,6 @@ function construireEtapes(route: Route, contexte: ContexteGtfs, retour: boolean)
   return etapes;
 }
 
-function melanger<T>(valeurs: T[]): T[] {
-  const resultat = [...valeurs];
-  for (let index = resultat.length - 1; index > 0; index--) {
-    const autre = Math.floor(Math.random() * (index + 1));
-    [resultat[index], resultat[autre]] = [resultat[autre]!, resultat[index]!];
-  }
-  return resultat;
-}
-
 async function chercherRetours(
   destination: GareGtfs,
   origine: GareGtfs,
@@ -338,13 +336,22 @@ export async function genererTrajetAvecHorairesReels(
 
   const minutesDisponibles = Math.floor(retourAvant.diff(departLe, "minutes").minutes);
   const rayonMaxKm = Math.min(350, minutesDisponibles * 1.1);
-  const destinations = melanger(
-    contexteAller.gares.filter((candidate) => {
-      if (candidate.gare.id === origine.gare.id) return false;
-      const distance = km(origine.gare, candidate.gare);
-      return distance >= MIN_DISTANCE_TRAJET_KM && distance <= rayonMaxKm;
-    }),
-  ).slice(0, MAX_DESTINATIONS_TENTEES);
+  const candidates = contexteAller.gares.filter((candidate) => {
+    if (candidate.gare.id === origine.gare.id) return false;
+    const distance = km(origine.gare, candidate.gare);
+    return distance >= MIN_DISTANCE_TRAJET_KM && distance <= rayonMaxKm;
+  });
+  // Une destination imposée rejoue un billet partagé ; sinon on tire au sort, avec la même
+  // suite pour tout le monde quand une graine est fournie (tirage du jour).
+  const aleatoire = input.graine === undefined ? Math.random : aleatoireSeme(input.graine);
+  const destinations =
+    input.destinationId === undefined
+      ? // Le tirage du jour n'a qu'une chance par gare : il essaie toutes les destinations.
+        melanger(candidates, aleatoire).slice(
+          0,
+          input.graine === undefined ? MAX_DESTINATIONS_TENTEES : candidates.length,
+        )
+      : candidates.filter((candidate) => candidate.gare.id === input.destinationId);
 
   for (const destination of destinations) {
     const resultatAller = contexteAller.routeur.route(
@@ -400,6 +407,7 @@ export async function genererTrajetAvecHorairesReels(
     const depts = [...new Set(etapes.map((etape) => etape.gare.dept).filter(Boolean))];
 
     return {
+      destinationId: destination.gare.id,
       etapes,
       etapesAller,
       etapesRetour,

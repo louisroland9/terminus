@@ -12,6 +12,10 @@ Application web ludique : depuis une gare choisie, **tirer au hasard un trajet T
 - Affichage d'une timeline d'étapes : heures d'arrivée/départ, correspondances, trajets à pied, n° de ligne.
 - Statistiques : durée totale, distance cumulée, départements traversés, nombre d'options de retour avant l'échéance.
 - Lien de vérification vers SNCF Connect + mention licence ODbL.
+- **Billet partageable** : `/t/$code` rejoue le même aller-retour jusqu'à l'échéance de retour, avec aperçu social (`public/og.png`).
+- **Récap emoji** copié au partage et **carnet local** (gares, départements, carte de France).
+- **Tirage du jour** : même gare + même jour = même destination (08:00 → 22:00, heure de Paris), avec série de jours.
+- Mesure d'audience Plausible, désactivée sans domaine configuré.
 
 ## Source de données
 

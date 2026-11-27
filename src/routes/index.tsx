@@ -1,16 +1,37 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ResultatBillet } from "@/components/billet/resultat-billet";
+import { CarteCarnet } from "@/components/carnet/carte-carnet";
+import { ChoixMode } from "@/components/choix-mode";
+import { Habillage } from "@/components/habillage";
+import { useCarnet } from "@/hooks/use-carnet";
+import { suivreEvenement } from "@/lib/analytics";
+import { encoderBillet, type Billet } from "@/lib/billet";
+import { departementsDebloques, serieEnCours } from "@/lib/carnet";
 import { proposerTrajetAvecHorairesReels } from "@/lib/horaires";
 import {
-  GARES,
-  chercher,
-  duree,
-  type Etape,
-  type Gare,
-  type TrajetAllerRetour,
-} from "@/lib/trajet";
+  LIBELLE_FENETRE,
+  fenetreDuJour,
+  graineDuJour,
+  jourParis,
+  numeroDuJour,
+} from "@/lib/quotidien";
+import type { RecapDuJour } from "@/lib/recap";
+import { metaApercu } from "@/lib/seo";
+import { GARES, chercher, type Gare, type TrajetAllerRetour } from "@/lib/trajet";
+
+declare module "@tanstack/react-router" {
+  interface HistoryState {
+    billet?: string;
+  }
+}
 
 export const Route = createFileRoute("/")({
+  // `?gare=` préremplit la gare de départ (depuis un billet partagé).
+  validateSearch: (search: Record<string, unknown>): { gare?: number } => {
+    const gare = search["gare"];
+    return typeof gare === "number" && GARES[gare] ? { gare } : {};
+  },
   head: () => ({
     meta: [
       { title: "Terminus — un trajet TER au pif depuis ta gare" },
@@ -19,20 +40,16 @@ export const Route = createFileRoute("/")({
         content:
           "Choisis une gare, tire un trajet TER aléatoire avec correspondances et redécouvre les lignes régionales de France.",
       },
-      { property: "og:title", content: "Terminus — un trajet TER au pif" },
-      {
-        property: "og:description",
-        content:
+      ...metaApercu({
+        titre: "Terminus — un trajet TER au pif",
+        description:
           "Une gare, un tirage, une aventure régionale. Les petites lignes françaises n'attendent que toi.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
+        chemin: "/",
+      }),
     ],
   }),
   component: Index,
 });
-
-const MARQUEE = "PETITES LIGNES ★ GRANDES AVENTURES ★ TCHOU TCHOU ★ ZÉRO PLAN ★ 100% RÉGIONAL ★ ";
 
 const valeurDate = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -40,14 +57,24 @@ const valeurHeure = (date: Date) =>
   `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 
 function Index() {
-  const [q, setQ] = useState("");
-  const [gare, setGare] = useState<Gare | null>(null);
+  const router = useRouter();
+  const gareInitiale = GARES[Route.useSearch().gare ?? -1] ?? null;
+  const [q, setQ] = useState(gareInitiale?.nom ?? "");
+  const [gare, setGare] = useState<Gare | null>(gareInitiale);
   const [open, setOpen] = useState(false);
   const [hl, setHl] = useState(0);
-  const [trajet, setTrajet] = useState<TrajetAllerRetour | null>(null);
+  const [resultat, setResultat] = useState<{
+    trajet: TrajetAllerRetour;
+    billet: Billet;
+    numero: number;
+    departementsCarnet: number;
+    duJour?: RecapDuJour;
+  } | null>(null);
   const [roule, setRoule] = useState(false);
   const [flash, setFlash] = useState("");
-  const [n, setN] = useState(0);
+  const { carnet, enregistrer } = useCarnet();
+  const [modeDuJour, setModeDuJour] = useState(false);
+  const serie = carnet ? serieEnCours(carnet, jourParis()) : 0;
   const [retour, setRetour] = useState(() => {
     const deadline = new Date(Date.now() + 4 * 60 * 60 * 1000);
     if (deadline.getMinutes() || deadline.getSeconds() || deadline.getMilliseconds()) {
@@ -73,21 +100,42 @@ function Index() {
     setOpen(false);
   };
 
+  // La page reste en place, mais la barre d'adresse montre le lien du billet.
+  const afficherLienBillet = (billet: Billet) => {
+    const code = encoderBillet(billet);
+    void router.navigate({
+      to: "/",
+      state: { billet: code },
+      mask: { to: "/t/$code", params: { code }, unmaskOnReload: true },
+      replace: true,
+      resetScroll: false,
+    });
+  };
+
   const tirer = () => {
     const g = gare ?? res[0];
     if (!g) return;
-    const departLe = new Date();
-    departLe.setSeconds(0, 0);
-    departLe.setMinutes(departLe.getMinutes() + 5);
-    const retourAvant = new Date(`${retour.jour}T${retour.heure}`);
-    if (Number.isNaN(retourAvant.getTime()) || retourAvant <= departLe) {
-      setErreurRetour("Choisis une échéance située après le départ estimé.");
-      return;
+    const jour = modeDuJour ? jourParis() : null;
+    let departLe: Date;
+    let retourAvant: Date;
+    if (jour) {
+      ({ departLe, retourAvant } = fenetreDuJour(jour));
+    } else {
+      departLe = new Date();
+      departLe.setSeconds(0, 0);
+      departLe.setMinutes(departLe.getMinutes() + 5);
+      retourAvant = new Date(`${retour.jour}T${retour.heure}`);
+      if (Number.isNaN(retourAvant.getTime()) || retourAvant <= departLe) {
+        setErreurRetour("Choisis une échéance située après le départ estimé.");
+        return;
+      }
     }
+    suivreEvenement(jour ? "Daily Draw" : "Random Journey Launched");
     if (!gare) choisir(g);
     setErreurRetour("");
     setRoule(true);
-    setTrajet(null);
+    setResultat(null);
+    void router.navigate({ to: "/", replace: true, resetScroll: false });
     let i = 0;
     timer.current = window.setInterval(() => {
       setFlash(GARES[Math.floor(Math.random() * GARES.length)]!.nom);
@@ -99,14 +147,35 @@ function Index() {
             gareDepartId: g.id,
             departLe: departLe.toISOString(),
             retourAvant: retourAvant.toISOString(),
+            ...(jour && { graine: graineDuJour(jour, g.id) }),
           },
         })
-          .then((proposition) => {
-            setTrajet(proposition);
-            if (!proposition) {
-              setErreurRetour("Aucun aller-retour SNCF trouvé pour cette gare avant la deadline.");
+          .then((trajet) => {
+            if (!trajet) {
+              setErreurRetour(
+                jour
+                  ? "Pas de Terminus du jour depuis cette gare aujourd'hui."
+                  : "Aucun aller-retour SNCF trouvé pour cette gare avant la deadline.",
+              );
+              return;
             }
-            setN((x) => x + 1);
+            const billet = {
+              origineId: g.id,
+              destinationId: trajet.destinationId,
+              departLe,
+              retourAvant,
+            };
+            const suivant = enregistrer(trajet, jour ? { jour, gareId: g.id } : undefined);
+            setResultat({
+              trajet,
+              billet,
+              numero: suivant.billets,
+              departementsCarnet: departementsDebloques(suivant),
+              ...(jour && {
+                duJour: { numero: numeroDuJour(jour), serie: serieEnCours(suivant, jour) },
+              }),
+            });
+            afficherLienBillet(billet);
           })
           .catch((error: unknown) => {
             console.error(error);
@@ -117,35 +186,8 @@ function Index() {
     }, 70);
   };
 
-  const gareDepart = trajet?.etapesAller[0]?.gare;
-  const deadlineFormatee = trajet?.dateLimiteRetour.toLocaleString("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const autresTrajetsAvantDeadline = Math.max(0, (trajet?.possibilitesAvantRetour ?? 1) - 1);
-
   return (
-    <div className="min-h-screen overflow-x-hidden">
-      {/* bandeau défilant */}
-      <div className="border-b-[3px] bg-secondary py-2 text-secondary-foreground">
-        <div className="flex w-max animate-marquee font-display text-sm tracking-wider">
-          <span>{MARQUEE.repeat(4)}</span>
-          <span>{MARQUEE.repeat(4)}</span>
-        </div>
-      </div>
-
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 pt-6">
-        <div className="brut -rotate-2 rounded-xl bg-card px-4 py-2 font-display text-lg">
-          TERMINUS
-        </div>
-        <div className="hidden rotate-3 rounded-full brut bg-pop px-4 py-1.5 font-mono text-xs font-bold sm:block">
-          {GARES.length.toLocaleString("fr-FR")} gares dans le chapeau
-        </div>
-      </header>
-
+    <Habillage>
       <main className="mx-auto max-w-6xl px-5 pb-24">
         <section className="relative pt-12 text-center">
           <div className="absolute left-2 top-6 hidden size-28 animate-spin-slow place-items-center rounded-full brut bg-accent font-display text-[11px] leading-tight md:grid">
@@ -240,41 +282,64 @@ function Index() {
                 {roule ? "Ça tourne…" : "Tirer ! 🎰"}
               </button>
             </div>
-            <div className="mx-auto mt-5 grid max-w-md grid-cols-2 gap-3 text-left">
-              <label className="font-mono text-xs font-bold uppercase">
-                Être rentré le
-                <input
-                  type="date"
-                  value={retour.jour}
-                  min={valeurDate(new Date())}
-                  onChange={(event) => {
-                    setRetour((value) => ({ ...value, jour: event.target.value }));
-                    setErreurRetour("");
-                  }}
-                  className="mt-1 w-full rounded-xl brut bg-card px-3 py-3 text-sm font-bold outline-none"
-                />
-              </label>
-              <label className="font-mono text-xs font-bold uppercase">
-                Avant
-                <input
-                  type="time"
-                  value={retour.heure}
-                  min={retour.jour === valeurDate(new Date()) ? valeurHeure(new Date()) : undefined}
-                  onChange={(event) => {
-                    setRetour((value) => ({ ...value, heure: event.target.value }));
-                    setErreurRetour("");
-                  }}
-                  className="mt-1 w-full rounded-xl brut bg-card px-3 py-3 text-sm font-bold outline-none"
-                />
-              </label>
-            </div>
+            <ChoixMode
+              duJour={modeDuJour}
+              desactive={roule}
+              onChange={(valeur) => {
+                setModeDuJour(valeur);
+                setErreurRetour("");
+              }}
+            />
+            {modeDuJour ? (
+              <div className="mx-auto mt-5 max-w-md rounded-2xl brut bg-card p-4 text-sm font-bold">
+                <p>Même gare, même jour : même destination pour tout le monde.</p>
+                <p className="mt-1 font-mono text-xs">{LIBELLE_FENETRE}</p>
+                {serie > 0 && (
+                  <p className="mt-2">
+                    🔥 {serie} jour{serie > 1 ? "s" : ""} d'affilée
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="mx-auto mt-5 grid max-w-md grid-cols-2 gap-3 text-left">
+                <label className="font-mono text-xs font-bold uppercase">
+                  Être rentré le
+                  <input
+                    type="date"
+                    value={retour.jour}
+                    min={valeurDate(new Date())}
+                    onChange={(event) => {
+                      setRetour((value) => ({ ...value, jour: event.target.value }));
+                      setErreurRetour("");
+                    }}
+                    className="mt-1 w-full rounded-xl brut bg-card px-3 py-3 text-sm font-bold outline-none"
+                  />
+                </label>
+                <label className="font-mono text-xs font-bold uppercase">
+                  Avant
+                  <input
+                    type="time"
+                    value={retour.heure}
+                    min={
+                      retour.jour === valeurDate(new Date()) ? valeurHeure(new Date()) : undefined
+                    }
+                    onChange={(event) => {
+                      setRetour((value) => ({ ...value, heure: event.target.value }));
+                      setErreurRetour("");
+                    }}
+                    className="mt-1 w-full rounded-xl brut bg-card px-3 py-3 text-sm font-bold outline-none"
+                  />
+                </label>
+              </div>
+            )}
             {erreurRetour && (
               <p role="alert" className="mx-auto mt-4 max-w-md text-sm font-bold text-destructive">
                 {erreurRetour}
               </p>
             )}
             <p className="mt-2 text-center font-mono text-xs text-muted-foreground">
-              Prochain TER disponible · horaires théoriques SNCF, retards non inclus
+              {modeDuJour ? "Terminus du jour" : "Prochain TER disponible"} · horaires théoriques
+              SNCF, retards non inclus
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {["Morlaix", "Briançon", "Mende", "Carhaix", "Saint-Flour"].map((s) => (
@@ -304,7 +369,7 @@ function Index() {
             </div>
           )}
 
-          {!roule && !trajet && (
+          {!roule && !resultat && (
             <div className="relative mx-auto h-24 max-w-3xl overflow-hidden">
               <div className="absolute bottom-2 left-0 right-0 border-b-[3px] border-dashed" />
               <div className="absolute bottom-4 animate-ride whitespace-nowrap text-5xl">
@@ -313,158 +378,31 @@ function Index() {
             </div>
           )}
 
-          {trajet && gareDepart && !roule && (
-            <div key={n} className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1fr_320px]">
-              <div className="flex min-w-0 flex-col gap-6">
-                <article className="animate-pop-in rounded-3xl brut-lg bg-card p-6 sm:p-8">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className="rounded-full bg-foreground px-3 py-1 font-mono text-xs font-bold uppercase text-background">
-                      Aller · billet n°{String(n).padStart(3, "0")}
-                    </span>
-                    <span className="-rotate-3 rounded-lg brut bg-pop px-3 py-1 font-display text-sm">
-                      {trajet.etapesAller.filter((etape) => etape.train).length} TER d'affilée
-                    </span>
-                  </div>
-                  <ListeEtapes etapes={trajet.etapesAller} />
-                </article>
-
-                <article
-                  className="animate-pop-in rounded-3xl brut-lg bg-primary p-6 text-primary-foreground sm:p-8"
-                  style={{ animationDelay: "150ms" }}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className="rounded-full bg-black/10 px-3 py-1 font-mono text-xs font-bold uppercase">
-                      Retour · {trajet.etapesRetour.filter((etape) => etape.train).length} TER
-                    </span>
-                    <span className="font-mono text-xs font-bold uppercase tracking-widest">
-                      Au plus près de la deadline
-                    </span>
-                  </div>
-                  <p className="mt-5 font-display text-2xl leading-tight">
-                    Retour à {gareDepart.nom}
-                  </p>
-                  <p className="mt-2 font-mono text-xs">Dernier trajet avant {deadlineFormatee}</p>
-                  <p className="mt-3 rounded-lg bg-black/10 px-3 py-2 text-sm font-bold">
-                    {autresTrajetsAvantDeadline} autres trajets arrivent avant {deadlineFormatee}
-                  </p>
-                  <div className="mt-6 border-t border-current/30 pt-6">
-                    <ListeEtapes etapes={trajet.etapesRetour} retour />
-                  </div>
-                </article>
-              </div>
-
-              <aside className="flex flex-col gap-5">
-                <div
-                  className="animate-pop-in -rotate-1 grid grid-cols-2 gap-3 rounded-3xl brut bg-card p-5"
-                  style={{ animationDelay: "250ms" }}
-                >
-                  <Stat label="Durée aller-retour" value={duree(trajet.duree)} />
-                  <Stat label="Distance" value={`${trajet.distance} km`} />
-                  <Stat label="Départements" value={String(trajet.depts.length)} />
-                  <Stat label="CO₂ vs voiture" value="÷ 30 🌱" />
-                </div>
-                <button
-                  onClick={tirer}
-                  className="press rounded-2xl brut bg-accent py-4 font-display uppercase"
-                >
-                  Relancer 🔄
-                </button>
-                <a
-                  href="https://www.sncf-connect.com/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="press rounded-2xl brut bg-secondary py-4 text-center font-bold text-secondary-foreground"
-                >
-                  Vérifier sur SNCF Connect ↗
-                </a>
-              </aside>
-            </div>
+          {resultat && !roule && (
+            <ResultatBillet
+              trajet={resultat.trajet}
+              billet={resultat.billet}
+              numero={resultat.numero}
+              departementsCarnet={resultat.departementsCarnet}
+              duJour={resultat.duJour}
+              action={
+                // Relancer le tirage du jour redonnerait le même billet.
+                !resultat.duJour &&
+                !modeDuJour && (
+                  <button
+                    onClick={tirer}
+                    className="press rounded-2xl brut bg-accent py-4 font-display uppercase"
+                  >
+                    Relancer 🔄
+                  </button>
+                )
+              }
+            />
           )}
+
+          {!roule && carnet && carnet.billets > 0 && <CarteCarnet carnet={carnet} />}
         </section>
       </main>
-
-      <footer className="border-t-[3px] bg-card px-5 py-6 text-center font-mono text-xs">
-        Horaires théoriques :{" "}
-        <a
-          className="underline"
-          href="https://transport.data.gouv.fr/datasets/horaires-sncf"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open Data SNCF (ODbL)
-        </a>{" "}
-        — retards non inclus. Confirme les horaires sur SNCF Connect avant le départ. 🚂
-      </footer>
-    </div>
-  );
-}
-
-function ListeEtapes({ etapes, retour = false }: { etapes: Etape[]; retour?: boolean }) {
-  return (
-    <ol className="space-y-0">
-      {etapes.map((etape, index) => {
-        const premiere = index === 0;
-        const derniere = index === etapes.length - 1;
-        const teinteSecondaire = retour ? "text-primary-foreground/70" : "text-muted-foreground";
-
-        return (
-          <li
-            key={`${etape.gare.id}-${index}`}
-            className="relative flex gap-4 pb-6 last:pb-0"
-            style={{ animationDelay: `${index * 120}ms` }}
-          >
-            {!derniere && (
-              <span className="absolute left-[15px] top-8 bottom-0 w-[4px] bg-[repeating-linear-gradient(var(--foreground)_0_8px,transparent_8px_14px)]" />
-            )}
-            <span
-              className={`relative z-10 grid size-8 shrink-0 place-items-center rounded-full border-[3px] text-sm ${premiere ? "bg-pop" : derniere ? "bg-primary" : "bg-accent"}`}
-            >
-              {premiere ? (retour ? "↩" : "🏁") : derniere ? (retour ? "🏁" : "🎯") : "🔁"}
-            </span>
-            <div className="flex-1">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-xl font-bold leading-tight">{etape.gare.nom}</p>
-                <p className="font-mono text-sm font-bold">
-                  {etape.arrivee && <span>arr. {etape.arrivee}</span>}
-                  {etape.arrivee && etape.depart && " · "}
-                  {etape.depart && (
-                    <span className={retour ? "text-primary-foreground" : "text-primary"}>
-                      dép. {etape.depart}
-                    </span>
-                  )}
-                </p>
-              </div>
-              <p className={`text-sm ${teinteSecondaire}`}>{etape.gare.dept}</p>
-              {etape.attente && (
-                <p className="mt-1 inline-block rounded bg-black/10 px-2 font-mono text-xs font-bold">
-                  ☕ {etape.attente} min de correspondance
-                </p>
-              )}
-              {etape.marcheVers && etape.marcheMinutes !== undefined && (
-                <p className="mt-1 inline-block rounded bg-black/10 px-2 font-mono text-xs font-bold">
-                  🚶 {etape.marcheMinutes} min à pied jusqu'à {etape.marcheVers}
-                </p>
-              )}
-              {etape.train && (
-                <p className="mt-2 inline-block rounded-lg border-2 border-dashed px-2 py-0.5 font-mono text-xs font-bold">
-                  🚃 {etape.train}
-                </p>
-              )}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-        {label}
-      </p>
-      <p className="font-display text-lg">{value}</p>
-    </div>
+    </Habillage>
   );
 }

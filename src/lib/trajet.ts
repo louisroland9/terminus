@@ -34,6 +34,7 @@ export type Trajet = {
   depts: string[];
 };
 export type TrajetAllerRetour = Trajet & {
+  destinationId: number;
   etapesAller: Etape[];
   etapesRetour: Etape[];
   retourPrevu: Date;
@@ -42,6 +43,13 @@ export type TrajetAllerRetour = Trajet & {
 };
 
 export const duree = (m: number) => `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`;
+
+// Facteurs ADEME « Impact CO2 » en gCO2e/km, fabrication incluse (impactco2.fr/outils/transport).
+// La voiture est une thermique moyenne diesel, comptée avec une seule personne à bord.
+const CO2_TER_G_PAR_KM = 27.7;
+const CO2_VOITURE_G_PAR_KM = 142;
+export const co2EviteKg = (distanceKm: number) =>
+  Math.round((distanceKm * (CO2_VOITURE_G_PAR_KM - CO2_TER_G_PAR_KM)) / 1000);
 
 const norm = (s: string) =>
   s

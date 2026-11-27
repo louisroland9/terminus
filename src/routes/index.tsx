@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { suivreEvenement } from "@/lib/analytics";
 import { proposerTrajetAvecHorairesReels } from "@/lib/horaires";
 import {
   GARES,
@@ -84,6 +85,7 @@ function Index() {
       setErreurRetour("Choisis une échéance située après le départ estimé.");
       return;
     }
+    suivreEvenement("Random Journey Launched");
     if (!gare) choisir(g);
     setErreurRetour("");
     setRoule(true);
@@ -373,6 +375,7 @@ function Index() {
                   href="https://www.sncf-connect.com/"
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => suivreEvenement("SNCF Connect Click")}
                   className="press rounded-2xl brut bg-secondary py-4 text-center font-bold text-secondary-foreground"
                 >
                   Vérifier sur SNCF Connect ↗

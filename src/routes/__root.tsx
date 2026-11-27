@@ -6,66 +6,67 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
 import { initAnalytics } from "@/lib/analytics";
 import appCss from "../styles.css?url";
 
-function NotFoundComponent() {
+function PageSimple({
+  titre,
+  texte,
+  children,
+}: {
+  titre: string;
+  texte: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Go home
-          </Link>
-        </div>
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="max-w-md rounded-3xl brut-lg bg-card p-8 text-center">
+        <h1 className="font-display text-4xl leading-tight">{titre}</h1>
+        <p className="mt-4 font-medium">{texte}</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-4">{children}</div>
       </div>
     </div>
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+const BOUTON = "press rounded-2xl brut px-5 py-3 font-display text-sm uppercase";
+
+function NotFoundComponent() {
+  return (
+    <PageSimple titre="404 🚧" texte="Cette voie ne mène nulle part. Même nos TER n'y vont pas.">
+      <Link to="/" className={`${BOUTON} bg-primary text-primary-foreground`}>
+        Retour en gare
+      </Link>
+    </PageSimple>
+  );
+}
+
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Try again
-          </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Go home
-          </a>
-        </div>
-      </div>
-    </div>
+    <PageSimple
+      titre="Panne en voie"
+      texte="La page n'a pas pu se charger. Réessaie ou reviens en gare."
+    >
+      <button
+        onClick={() => {
+          void router.invalidate();
+          reset();
+        }}
+        className={`${BOUTON} bg-primary text-primary-foreground`}
+      >
+        Réessayer
+      </button>
+      <a href="/" className={`${BOUTON} bg-accent`}>
+        Retour en gare
+      </a>
+    </PageSimple>
   );
 }
 

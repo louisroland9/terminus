@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import { suivreEvenement } from "@/lib/analytics";
 import { encoderBillet, type Billet } from "@/lib/billet";
 import { partager } from "@/lib/partage";
-import { recapBillet } from "@/lib/recap";
+import { recapBillet, type RecapDuJour } from "@/lib/recap";
 import type { TrajetAllerRetour } from "@/lib/trajet";
 
 type Props = {
@@ -10,15 +10,16 @@ type Props = {
   trajet: TrajetAllerRetour;
   numero?: number | undefined;
   departementsCarnet?: number | undefined;
+  duJour?: RecapDuJour | undefined;
 };
 
-export function BoutonPartager({ billet, trajet, numero, departementsCarnet }: Props) {
+export function BoutonPartager({ billet, trajet, ...recap }: Props) {
   const partagerBillet = async () => {
     suivreEvenement("Share Clicked");
     const url = `${window.location.origin}/t/${encoderBillet(billet)}`;
     const issue = await partager({
       titre: "Terminus — mon billet",
-      texte: recapBillet(trajet, { numero, departementsCarnet }),
+      texte: recapBillet(trajet, recap),
       url,
     });
     if (issue === "copie") toast.success("Billet copié, colle-le où tu veux !");

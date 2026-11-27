@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { GARES } from "@/lib/trajet";
 
@@ -15,9 +16,9 @@ export function Habillage({ children }: { children: ReactNode }) {
       </div>
 
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 pt-6">
-        <div className="brut -rotate-2 rounded-xl bg-card px-4 py-2 font-display text-lg">
+        <Link to="/" className="brut -rotate-2 rounded-xl bg-card px-4 py-2 font-display text-lg">
           TERMINUS
-        </div>
+        </Link>
         <div className="hidden rotate-3 rounded-full brut bg-pop px-4 py-1.5 font-mono text-xs font-bold sm:block">
           {GARES.length.toLocaleString("fr-FR")} gares dans le chapeau
         </div>

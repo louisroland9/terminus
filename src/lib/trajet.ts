@@ -34,6 +34,7 @@ export type Trajet = {
   depts: string[];
 };
 export type TrajetAllerRetour = Trajet & {
+  destinationId: number;
   etapesAller: Etape[];
   etapesRetour: Etape[];
   retourPrevu: Date;

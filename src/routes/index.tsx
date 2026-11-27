@@ -1,12 +1,25 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ResultatBillet } from "@/components/billet/resultat-billet";
 import { Habillage } from "@/components/habillage";
 import { suivreEvenement } from "@/lib/analytics";
+import { encoderBillet, type Billet } from "@/lib/billet";
 import { proposerTrajetAvecHorairesReels } from "@/lib/horaires";
+import { metaApercu } from "@/lib/seo";
 import { GARES, chercher, type Gare, type TrajetAllerRetour } from "@/lib/trajet";
 
+declare module "@tanstack/react-router" {
+  interface HistoryState {
+    billet?: string;
+  }
+}
+
 export const Route = createFileRoute("/")({
+  // `?gare=` préremplit la gare de départ (depuis un billet partagé).
+  validateSearch: (search: Record<string, unknown>): { gare?: number } => {
+    const gare = search["gare"];
+    return typeof gare === "number" && GARES[gare] ? { gare } : {};
+  },
   head: () => ({
     meta: [
       { title: "Terminus — un trajet TER au pif depuis ta gare" },
@@ -15,14 +28,12 @@ export const Route = createFileRoute("/")({
         content:
           "Choisis une gare, tire un trajet TER aléatoire avec correspondances et redécouvre les lignes régionales de France.",
       },
-      { property: "og:title", content: "Terminus — un trajet TER au pif" },
-      {
-        property: "og:description",
-        content:
+      ...metaApercu({
+        titre: "Terminus — un trajet TER au pif",
+        description:
           "Une gare, un tirage, une aventure régionale. Les petites lignes françaises n'attendent que toi.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
+        chemin: "/",
+      }),
     ],
   }),
   component: Index,
@@ -34,11 +45,16 @@ const valeurHeure = (date: Date) =>
   `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 
 function Index() {
-  const [q, setQ] = useState("");
-  const [gare, setGare] = useState<Gare | null>(null);
+  const router = useRouter();
+  const gareInitiale = GARES[Route.useSearch().gare ?? -1] ?? null;
+  const [q, setQ] = useState(gareInitiale?.nom ?? "");
+  const [gare, setGare] = useState<Gare | null>(gareInitiale);
   const [open, setOpen] = useState(false);
   const [hl, setHl] = useState(0);
-  const [trajet, setTrajet] = useState<TrajetAllerRetour | null>(null);
+  const [resultat, setResultat] = useState<{
+    trajet: TrajetAllerRetour;
+    billet: Billet;
+  } | null>(null);
   const [roule, setRoule] = useState(false);
   const [flash, setFlash] = useState("");
   const [n, setN] = useState(0);
@@ -67,6 +83,18 @@ function Index() {
     setOpen(false);
   };
 
+  // La page reste en place, mais la barre d'adresse montre le lien du billet.
+  const afficherLienBillet = (billet: Billet) => {
+    const code = encoderBillet(billet);
+    void router.navigate({
+      to: "/",
+      state: { billet: code },
+      mask: { to: "/t/$code", params: { code }, unmaskOnReload: true },
+      replace: true,
+      resetScroll: false,
+    });
+  };
+
   const tirer = () => {
     const g = gare ?? res[0];
     if (!g) return;
@@ -82,7 +110,8 @@ function Index() {
     if (!gare) choisir(g);
     setErreurRetour("");
     setRoule(true);
-    setTrajet(null);
+    setResultat(null);
+    void router.navigate({ to: "/", replace: true, resetScroll: false });
     let i = 0;
     timer.current = window.setInterval(() => {
       setFlash(GARES[Math.floor(Math.random() * GARES.length)]!.nom);
@@ -96,12 +125,20 @@ function Index() {
             retourAvant: retourAvant.toISOString(),
           },
         })
-          .then((proposition) => {
-            setTrajet(proposition);
-            if (!proposition) {
+          .then((trajet) => {
+            if (!trajet) {
               setErreurRetour("Aucun aller-retour SNCF trouvé pour cette gare avant la deadline.");
+              return;
             }
+            const billet = {
+              origineId: g.id,
+              destinationId: trajet.destinationId,
+              departLe,
+              retourAvant,
+            };
+            setResultat({ trajet, billet });
             setN((x) => x + 1);
+            afficherLienBillet(billet);
           })
           .catch((error: unknown) => {
             console.error(error);
@@ -272,7 +309,7 @@ function Index() {
             </div>
           )}
 
-          {!roule && !trajet && (
+          {!roule && !resultat && (
             <div className="relative mx-auto h-24 max-w-3xl overflow-hidden">
               <div className="absolute bottom-2 left-0 right-0 border-b-[3px] border-dashed" />
               <div className="absolute bottom-4 animate-ride whitespace-nowrap text-5xl">
@@ -281,8 +318,21 @@ function Index() {
             </div>
           )}
 
-          {trajet && !roule && (
-            <ResultatBillet key={n} trajet={trajet} numero={n} onRelancer={tirer} />
+          {resultat && !roule && (
+            <ResultatBillet
+              key={n}
+              trajet={resultat.trajet}
+              billet={resultat.billet}
+              numero={n}
+              action={
+                <button
+                  onClick={tirer}
+                  className="press rounded-2xl brut bg-accent py-4 font-display uppercase"
+                >
+                  Relancer 🔄
+                </button>
+              }
+            />
           )}
         </section>
       </main>

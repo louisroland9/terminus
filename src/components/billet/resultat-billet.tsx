@@ -1,11 +1,19 @@
+import type { ReactNode } from "react";
+import { BoutonPartager } from "@/components/billet/bouton-partager";
 import { ListeEtapes } from "@/components/billet/liste-etapes";
 import { Stat } from "@/components/billet/stat";
 import { suivreEvenement } from "@/lib/analytics";
+import type { Billet } from "@/lib/billet";
 import { co2EviteKg, duree, type TrajetAllerRetour } from "@/lib/trajet";
 
-type Props = { trajet: TrajetAllerRetour; numero: number; onRelancer: () => void };
+type Props = {
+  trajet: TrajetAllerRetour;
+  billet: Billet;
+  numero?: number;
+  action: ReactNode;
+};
 
-export function ResultatBillet({ trajet, numero, onRelancer }: Props) {
+export function ResultatBillet({ trajet, billet, numero, action }: Props) {
   const gareDepart = trajet.etapesAller[0]?.gare;
   const deadlineFormatee = trajet.dateLimiteRetour.toLocaleString("fr-FR", {
     weekday: "long",
@@ -23,7 +31,10 @@ export function ResultatBillet({ trajet, numero, onRelancer }: Props) {
         <article className="animate-pop-in rounded-3xl brut-lg bg-card p-6 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="rounded-full bg-foreground px-3 py-1 font-mono text-xs font-bold uppercase text-background">
-              Aller · billet n°{String(numero).padStart(3, "0")}
+              Aller ·{" "}
+              {numero === undefined
+                ? "billet partagé"
+                : `billet n°${String(numero).padStart(3, "0")}`}
             </span>
             <span className="-rotate-3 rounded-lg brut bg-pop px-3 py-1 font-display text-sm">
               {trajet.etapesAller.filter((etape) => etape.train).length} TER d'affilée
@@ -68,12 +79,8 @@ export function ResultatBillet({ trajet, numero, onRelancer }: Props) {
             value={`≈ ${co2EviteKg(trajet.distance)} kg 🌱`}
           />
         </div>
-        <button
-          onClick={onRelancer}
-          className="press rounded-2xl brut bg-accent py-4 font-display uppercase"
-        >
-          Relancer 🔄
-        </button>
+        <BoutonPartager billet={billet} />
+        {action}
         <a
           href="https://www.sncf-connect.com/"
           target="_blank"

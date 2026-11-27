@@ -1,15 +1,24 @@
 import { toast } from "sonner";
 import { suivreEvenement } from "@/lib/analytics";
-import { encoderBillet, gareDuBillet, type Billet } from "@/lib/billet";
+import { encoderBillet, type Billet } from "@/lib/billet";
 import { partager } from "@/lib/partage";
+import { recapBillet } from "@/lib/recap";
+import type { TrajetAllerRetour } from "@/lib/trajet";
 
-export function BoutonPartager({ billet }: { billet: Billet }) {
+type Props = {
+  billet: Billet;
+  trajet: TrajetAllerRetour;
+  numero?: number | undefined;
+  departementsCarnet?: number | undefined;
+};
+
+export function BoutonPartager({ billet, trajet, numero, departementsCarnet }: Props) {
   const partagerBillet = async () => {
     suivreEvenement("Share Clicked");
     const url = `${window.location.origin}/t/${encoderBillet(billet)}`;
     const issue = await partager({
       titre: "Terminus — mon billet",
-      texte: `Le hasard m'envoie de ${gareDuBillet(billet.origineId).nom} à ${gareDuBillet(billet.destinationId).nom} en TER 🚂`,
+      texte: recapBillet(trajet, { numero, departementsCarnet }),
       url,
     });
     if (issue === "copie") toast.success("Billet copié, colle-le où tu veux !");

@@ -4,6 +4,7 @@ import { z } from "zod";
 const demandeTrajetSchema = z.object({
   gareDepartId: z.number().int().min(0).max(3000),
   destinationId: z.number().int().min(0).max(3000).optional(),
+  graine: z.string().max(40).optional(),
   departLe: z.string().datetime({ offset: true }),
   retourAvant: z.string().datetime({ offset: true }),
 });

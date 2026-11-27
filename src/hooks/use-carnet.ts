@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { ajouterBillet, ecrireCarnet, lireCarnet, type Carnet } from "@/lib/carnet";
+import {
+  ajouterBillet,
+  ecrireCarnet,
+  lireCarnet,
+  type Carnet,
+  type TirageDuJour,
+} from "@/lib/carnet";
 import type { TrajetAllerRetour } from "@/lib/trajet";
 
 export function useCarnet() {
@@ -8,8 +14,8 @@ export function useCarnet() {
 
   useEffect(() => setCarnet(lireCarnet()), []);
 
-  const enregistrer = (trajet: TrajetAllerRetour) => {
-    const suivant = ajouterBillet(lireCarnet(), trajet);
+  const enregistrer = (trajet: TrajetAllerRetour, duJour?: TirageDuJour) => {
+    const suivant = ajouterBillet(lireCarnet(), trajet, duJour);
     ecrireCarnet(suivant);
     setCarnet(suivant);
     return suivant;

@@ -2,12 +2,21 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ResultatBillet } from "@/components/billet/resultat-billet";
 import { CarteCarnet } from "@/components/carnet/carte-carnet";
+import { ChoixMode } from "@/components/choix-mode";
 import { Habillage } from "@/components/habillage";
 import { useCarnet } from "@/hooks/use-carnet";
 import { suivreEvenement } from "@/lib/analytics";
 import { encoderBillet, type Billet } from "@/lib/billet";
-import { departementsDebloques } from "@/lib/carnet";
+import { departementsDebloques, serieEnCours } from "@/lib/carnet";
 import { proposerTrajetAvecHorairesReels } from "@/lib/horaires";
+import {
+  LIBELLE_FENETRE,
+  fenetreDuJour,
+  graineDuJour,
+  jourParis,
+  numeroDuJour,
+} from "@/lib/quotidien";
+import type { RecapDuJour } from "@/lib/recap";
 import { metaApercu } from "@/lib/seo";
 import { GARES, chercher, type Gare, type TrajetAllerRetour } from "@/lib/trajet";
 
@@ -59,10 +68,13 @@ function Index() {
     billet: Billet;
     numero: number;
     departementsCarnet: number;
+    duJour?: RecapDuJour;
   } | null>(null);
   const [roule, setRoule] = useState(false);
   const [flash, setFlash] = useState("");
   const { carnet, enregistrer } = useCarnet();
+  const [modeDuJour, setModeDuJour] = useState(false);
+  const serie = carnet ? serieEnCours(carnet, jourParis()) : 0;
   const [retour, setRetour] = useState(() => {
     const deadline = new Date(Date.now() + 4 * 60 * 60 * 1000);
     if (deadline.getMinutes() || deadline.getSeconds() || deadline.getMilliseconds()) {
@@ -103,15 +115,22 @@ function Index() {
   const tirer = () => {
     const g = gare ?? res[0];
     if (!g) return;
-    const departLe = new Date();
-    departLe.setSeconds(0, 0);
-    departLe.setMinutes(departLe.getMinutes() + 5);
-    const retourAvant = new Date(`${retour.jour}T${retour.heure}`);
-    if (Number.isNaN(retourAvant.getTime()) || retourAvant <= departLe) {
-      setErreurRetour("Choisis une échéance située après le départ estimé.");
-      return;
+    const jour = modeDuJour ? jourParis() : null;
+    let departLe: Date;
+    let retourAvant: Date;
+    if (jour) {
+      ({ departLe, retourAvant } = fenetreDuJour(jour));
+    } else {
+      departLe = new Date();
+      departLe.setSeconds(0, 0);
+      departLe.setMinutes(departLe.getMinutes() + 5);
+      retourAvant = new Date(`${retour.jour}T${retour.heure}`);
+      if (Number.isNaN(retourAvant.getTime()) || retourAvant <= departLe) {
+        setErreurRetour("Choisis une échéance située après le départ estimé.");
+        return;
+      }
     }
-    suivreEvenement("Random Journey Launched");
+    suivreEvenement(jour ? "Daily Draw" : "Random Journey Launched");
     if (!gare) choisir(g);
     setErreurRetour("");
     setRoule(true);
@@ -128,11 +147,16 @@ function Index() {
             gareDepartId: g.id,
             departLe: departLe.toISOString(),
             retourAvant: retourAvant.toISOString(),
+            ...(jour && { graine: graineDuJour(jour, g.id) }),
           },
         })
           .then((trajet) => {
             if (!trajet) {
-              setErreurRetour("Aucun aller-retour SNCF trouvé pour cette gare avant la deadline.");
+              setErreurRetour(
+                jour
+                  ? "Pas de Terminus du jour depuis cette gare aujourd'hui."
+                  : "Aucun aller-retour SNCF trouvé pour cette gare avant la deadline.",
+              );
               return;
             }
             const billet = {
@@ -141,12 +165,15 @@ function Index() {
               departLe,
               retourAvant,
             };
-            const suivant = enregistrer(trajet);
+            const suivant = enregistrer(trajet, jour ? { jour, gareId: g.id } : undefined);
             setResultat({
               trajet,
               billet,
               numero: suivant.billets,
               departementsCarnet: departementsDebloques(suivant),
+              ...(jour && {
+                duJour: { numero: numeroDuJour(jour), serie: serieEnCours(suivant, jour) },
+              }),
             });
             afficherLienBillet(billet);
           })
@@ -255,41 +282,64 @@ function Index() {
                 {roule ? "Ça tourne…" : "Tirer ! 🎰"}
               </button>
             </div>
-            <div className="mx-auto mt-5 grid max-w-md grid-cols-2 gap-3 text-left">
-              <label className="font-mono text-xs font-bold uppercase">
-                Être rentré le
-                <input
-                  type="date"
-                  value={retour.jour}
-                  min={valeurDate(new Date())}
-                  onChange={(event) => {
-                    setRetour((value) => ({ ...value, jour: event.target.value }));
-                    setErreurRetour("");
-                  }}
-                  className="mt-1 w-full rounded-xl brut bg-card px-3 py-3 text-sm font-bold outline-none"
-                />
-              </label>
-              <label className="font-mono text-xs font-bold uppercase">
-                Avant
-                <input
-                  type="time"
-                  value={retour.heure}
-                  min={retour.jour === valeurDate(new Date()) ? valeurHeure(new Date()) : undefined}
-                  onChange={(event) => {
-                    setRetour((value) => ({ ...value, heure: event.target.value }));
-                    setErreurRetour("");
-                  }}
-                  className="mt-1 w-full rounded-xl brut bg-card px-3 py-3 text-sm font-bold outline-none"
-                />
-              </label>
-            </div>
+            <ChoixMode
+              duJour={modeDuJour}
+              desactive={roule}
+              onChange={(valeur) => {
+                setModeDuJour(valeur);
+                setErreurRetour("");
+              }}
+            />
+            {modeDuJour ? (
+              <div className="mx-auto mt-5 max-w-md rounded-2xl brut bg-card p-4 text-sm font-bold">
+                <p>Même gare, même jour : même destination pour tout le monde.</p>
+                <p className="mt-1 font-mono text-xs">{LIBELLE_FENETRE}</p>
+                {serie > 0 && (
+                  <p className="mt-2">
+                    🔥 {serie} jour{serie > 1 ? "s" : ""} d'affilée
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="mx-auto mt-5 grid max-w-md grid-cols-2 gap-3 text-left">
+                <label className="font-mono text-xs font-bold uppercase">
+                  Être rentré le
+                  <input
+                    type="date"
+                    value={retour.jour}
+                    min={valeurDate(new Date())}
+                    onChange={(event) => {
+                      setRetour((value) => ({ ...value, jour: event.target.value }));
+                      setErreurRetour("");
+                    }}
+                    className="mt-1 w-full rounded-xl brut bg-card px-3 py-3 text-sm font-bold outline-none"
+                  />
+                </label>
+                <label className="font-mono text-xs font-bold uppercase">
+                  Avant
+                  <input
+                    type="time"
+                    value={retour.heure}
+                    min={
+                      retour.jour === valeurDate(new Date()) ? valeurHeure(new Date()) : undefined
+                    }
+                    onChange={(event) => {
+                      setRetour((value) => ({ ...value, heure: event.target.value }));
+                      setErreurRetour("");
+                    }}
+                    className="mt-1 w-full rounded-xl brut bg-card px-3 py-3 text-sm font-bold outline-none"
+                  />
+                </label>
+              </div>
+            )}
             {erreurRetour && (
               <p role="alert" className="mx-auto mt-4 max-w-md text-sm font-bold text-destructive">
                 {erreurRetour}
               </p>
             )}
             <p className="mt-2 text-center font-mono text-xs text-muted-foreground">
-              Prochain TER disponible · horaires théoriques SNCF, retards non inclus
+              {modeDuJour ? "Terminus du jour" : "Prochain TER disponible"} · horaires théoriques
+              SNCF, retards non inclus
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {["Morlaix", "Briançon", "Mende", "Carhaix", "Saint-Flour"].map((s) => (
@@ -334,13 +384,18 @@ function Index() {
               billet={resultat.billet}
               numero={resultat.numero}
               departementsCarnet={resultat.departementsCarnet}
+              duJour={resultat.duJour}
               action={
-                <button
-                  onClick={tirer}
-                  className="press rounded-2xl brut bg-accent py-4 font-display uppercase"
-                >
-                  Relancer 🔄
-                </button>
+                // Relancer le tirage du jour redonnerait le même billet.
+                !resultat.duJour &&
+                !modeDuJour && (
+                  <button
+                    onClick={tirer}
+                    className="press rounded-2xl brut bg-accent py-4 font-display uppercase"
+                  >
+                    Relancer 🔄
+                  </button>
+                )
               }
             />
           )}

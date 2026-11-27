@@ -1,15 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ResultatBillet } from "@/components/billet/resultat-billet";
+import { Habillage } from "@/components/habillage";
 import { suivreEvenement } from "@/lib/analytics";
 import { proposerTrajetAvecHorairesReels } from "@/lib/horaires";
-import {
-  GARES,
-  chercher,
-  duree,
-  type Etape,
-  type Gare,
-  type TrajetAllerRetour,
-} from "@/lib/trajet";
+import { GARES, chercher, type Gare, type TrajetAllerRetour } from "@/lib/trajet";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -32,8 +27,6 @@ export const Route = createFileRoute("/")({
   }),
   component: Index,
 });
-
-const MARQUEE = "PETITES LIGNES ★ GRANDES AVENTURES ★ TCHOU TCHOU ★ ZÉRO PLAN ★ 100% RÉGIONAL ★ ";
 
 const valeurDate = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -119,35 +112,8 @@ function Index() {
     }, 70);
   };
 
-  const gareDepart = trajet?.etapesAller[0]?.gare;
-  const deadlineFormatee = trajet?.dateLimiteRetour.toLocaleString("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const autresTrajetsAvantDeadline = Math.max(0, (trajet?.possibilitesAvantRetour ?? 1) - 1);
-
   return (
-    <div className="min-h-screen overflow-x-hidden">
-      {/* bandeau défilant */}
-      <div className="border-b-[3px] bg-secondary py-2 text-secondary-foreground">
-        <div className="flex w-max animate-marquee font-display text-sm tracking-wider">
-          <span>{MARQUEE.repeat(4)}</span>
-          <span>{MARQUEE.repeat(4)}</span>
-        </div>
-      </div>
-
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 pt-6">
-        <div className="brut -rotate-2 rounded-xl bg-card px-4 py-2 font-display text-lg">
-          TERMINUS
-        </div>
-        <div className="hidden rotate-3 rounded-full brut bg-pop px-4 py-1.5 font-mono text-xs font-bold sm:block">
-          {GARES.length.toLocaleString("fr-FR")} gares dans le chapeau
-        </div>
-      </header>
-
+    <Habillage>
       <main className="mx-auto max-w-6xl px-5 pb-24">
         <section className="relative pt-12 text-center">
           <div className="absolute left-2 top-6 hidden size-28 animate-spin-slow place-items-center rounded-full brut bg-accent font-display text-[11px] leading-tight md:grid">
@@ -315,159 +281,11 @@ function Index() {
             </div>
           )}
 
-          {trajet && gareDepart && !roule && (
-            <div key={n} className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1fr_320px]">
-              <div className="flex min-w-0 flex-col gap-6">
-                <article className="animate-pop-in rounded-3xl brut-lg bg-card p-6 sm:p-8">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className="rounded-full bg-foreground px-3 py-1 font-mono text-xs font-bold uppercase text-background">
-                      Aller · billet n°{String(n).padStart(3, "0")}
-                    </span>
-                    <span className="-rotate-3 rounded-lg brut bg-pop px-3 py-1 font-display text-sm">
-                      {trajet.etapesAller.filter((etape) => etape.train).length} TER d'affilée
-                    </span>
-                  </div>
-                  <ListeEtapes etapes={trajet.etapesAller} />
-                </article>
-
-                <article
-                  className="animate-pop-in rounded-3xl brut-lg bg-primary p-6 text-primary-foreground sm:p-8"
-                  style={{ animationDelay: "150ms" }}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className="rounded-full bg-black/10 px-3 py-1 font-mono text-xs font-bold uppercase">
-                      Retour · {trajet.etapesRetour.filter((etape) => etape.train).length} TER
-                    </span>
-                    <span className="font-mono text-xs font-bold uppercase tracking-widest">
-                      Au plus près de la deadline
-                    </span>
-                  </div>
-                  <p className="mt-5 font-display text-2xl leading-tight">
-                    Retour à {gareDepart.nom}
-                  </p>
-                  <p className="mt-2 font-mono text-xs">Dernier trajet avant {deadlineFormatee}</p>
-                  <p className="mt-3 rounded-lg bg-black/10 px-3 py-2 text-sm font-bold">
-                    {autresTrajetsAvantDeadline} autres trajets arrivent avant {deadlineFormatee}
-                  </p>
-                  <div className="mt-6 border-t border-current/30 pt-6">
-                    <ListeEtapes etapes={trajet.etapesRetour} retour />
-                  </div>
-                </article>
-              </div>
-
-              <aside className="flex flex-col gap-5">
-                <div
-                  className="animate-pop-in -rotate-1 grid grid-cols-2 gap-3 rounded-3xl brut bg-card p-5"
-                  style={{ animationDelay: "250ms" }}
-                >
-                  <Stat label="Durée aller-retour" value={duree(trajet.duree)} />
-                  <Stat label="Distance" value={`${trajet.distance} km`} />
-                  <Stat label="Départements" value={String(trajet.depts.length)} />
-                  <Stat label="CO₂ vs voiture" value="÷ 30 🌱" />
-                </div>
-                <button
-                  onClick={tirer}
-                  className="press rounded-2xl brut bg-accent py-4 font-display uppercase"
-                >
-                  Relancer 🔄
-                </button>
-                <a
-                  href="https://www.sncf-connect.com/"
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => suivreEvenement("SNCF Connect Click")}
-                  className="press rounded-2xl brut bg-secondary py-4 text-center font-bold text-secondary-foreground"
-                >
-                  Vérifier sur SNCF Connect ↗
-                </a>
-              </aside>
-            </div>
+          {trajet && !roule && (
+            <ResultatBillet key={n} trajet={trajet} numero={n} onRelancer={tirer} />
           )}
         </section>
       </main>
-
-      <footer className="border-t-[3px] bg-card px-5 py-6 text-center font-mono text-xs">
-        Horaires théoriques :{" "}
-        <a
-          className="underline"
-          href="https://transport.data.gouv.fr/datasets/horaires-sncf"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open Data SNCF (ODbL)
-        </a>{" "}
-        — retards non inclus. Confirme les horaires sur SNCF Connect avant le départ. 🚂
-      </footer>
-    </div>
-  );
-}
-
-function ListeEtapes({ etapes, retour = false }: { etapes: Etape[]; retour?: boolean }) {
-  return (
-    <ol className="space-y-0">
-      {etapes.map((etape, index) => {
-        const premiere = index === 0;
-        const derniere = index === etapes.length - 1;
-        const teinteSecondaire = retour ? "text-primary-foreground/70" : "text-muted-foreground";
-
-        return (
-          <li
-            key={`${etape.gare.id}-${index}`}
-            className="relative flex gap-4 pb-6 last:pb-0"
-            style={{ animationDelay: `${index * 120}ms` }}
-          >
-            {!derniere && (
-              <span className="absolute left-[15px] top-8 bottom-0 w-[4px] bg-[repeating-linear-gradient(var(--foreground)_0_8px,transparent_8px_14px)]" />
-            )}
-            <span
-              className={`relative z-10 grid size-8 shrink-0 place-items-center rounded-full border-[3px] text-sm ${premiere ? "bg-pop" : derniere ? "bg-primary" : "bg-accent"}`}
-            >
-              {premiere ? (retour ? "↩" : "🏁") : derniere ? (retour ? "🏁" : "🎯") : "🔁"}
-            </span>
-            <div className="flex-1">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-xl font-bold leading-tight">{etape.gare.nom}</p>
-                <p className="font-mono text-sm font-bold">
-                  {etape.arrivee && <span>arr. {etape.arrivee}</span>}
-                  {etape.arrivee && etape.depart && " · "}
-                  {etape.depart && (
-                    <span className={retour ? "text-primary-foreground" : "text-primary"}>
-                      dép. {etape.depart}
-                    </span>
-                  )}
-                </p>
-              </div>
-              <p className={`text-sm ${teinteSecondaire}`}>{etape.gare.dept}</p>
-              {etape.attente && (
-                <p className="mt-1 inline-block rounded bg-black/10 px-2 font-mono text-xs font-bold">
-                  ☕ {etape.attente} min de correspondance
-                </p>
-              )}
-              {etape.marcheVers && etape.marcheMinutes !== undefined && (
-                <p className="mt-1 inline-block rounded bg-black/10 px-2 font-mono text-xs font-bold">
-                  🚶 {etape.marcheMinutes} min à pied jusqu'à {etape.marcheVers}
-                </p>
-              )}
-              {etape.train && (
-                <p className="mt-2 inline-block rounded-lg border-2 border-dashed px-2 py-0.5 font-mono text-xs font-bold">
-                  🚃 {etape.train}
-                </p>
-              )}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-        {label}
-      </p>
-      <p className="font-display text-lg">{value}</p>
-    </div>
+    </Habillage>
   );
 }
